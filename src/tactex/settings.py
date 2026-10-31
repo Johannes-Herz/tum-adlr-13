@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Self
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     )
 
     data_root: Path = Path("data")
+    hf_token: SecretStr | None = None
 
     @property
     def project_root(self) -> Path:
