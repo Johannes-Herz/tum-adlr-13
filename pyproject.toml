@@ -7,7 +7,9 @@ authors = [
     { name = "Johannes-Herz", email = "herz.johannes@gmx.net" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic-settings>=2.16.2",
+]
 
 [project.scripts]
 tactex = "tactex.cli:main"
