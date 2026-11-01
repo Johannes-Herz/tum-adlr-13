@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tactex.shapes.generators.grid import rasterize, sdf_to_occupancy
+from tactex.shapes.grid import rasterize, sdf_to_occupancy
 from tactex.shapes.ioop import save
 from tactex.shapes.sdf import circle as circle_sdf
 
