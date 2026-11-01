@@ -1410,6 +1410,7 @@ name = "tactile-exploration-of-objects"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "numpy" },
     { name = "pydantic-settings" },
 ]
 
@@ -1424,7 +1425,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic-settings", specifier = ">=2.16.2" }]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.5.4" },
+    { name = "pydantic-settings", specifier = ">=2.16.2" },
+]
 
 [package.metadata.requires-dev]
 dev = [
