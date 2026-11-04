@@ -73,8 +73,21 @@ def rectangle(
 
 
 def triangle(vertices: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
-    """
-    vertices: shape (n, 3, 2)
+    """Build a batched signed distance function for n triangles.
+
+    The distance is the minimum distance from a point to the three edge
+    segments, found by projecting the point onto each edge and clamping the
+    projection to the segment. The sign comes from 2D cross products: a point
+    is inside if it lies on the same side of all three edges. This works for
+    both clockwise and counterclockwise vertex order.
+
+    Args:
+        vertices: Shape (n, 3, 2), the three corner points of each triangle.
+            Triangles must be non-degenerate (no repeated vertices).
+
+    Returns:
+        A function mapping points of shape (p, 2) to signed distances of
+        shape (n, p): negative inside, zero on the boundary, positive outside.
     """
     vertices = vertices[:, :, None, :]
 
