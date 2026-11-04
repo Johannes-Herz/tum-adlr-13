@@ -13,6 +13,7 @@ def save(
     occupancy_grids: np.ndarray,
     sdf_grids: np.ndarray,
     resolution: int,
+    seed: int | None,
     **kwargs,
 ) -> Path:
     """Save occupancy grids and their parameters to a timestamped .npz file.
@@ -49,6 +50,7 @@ def save(
         occupancy_grids=occupancy_grids.astype(np.int8),
         sdf_grids=sdf_grids,
         resolution=resolution,
+        seed=seed,
         **kwargs,
     )
     return filepath

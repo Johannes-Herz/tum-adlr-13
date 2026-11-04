@@ -52,6 +52,7 @@ if __name__ == "__main__":
         occupancy_grids=occupancy_grids,
         sdf_grids=sdf_grids,
         resolution=args.resolution,
+        seed=args.seed,
         radii=radii,
         centers=centers,
     )
