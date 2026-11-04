@@ -20,7 +20,8 @@ def circle(
     def sdf(points: np.ndarray) -> np.ndarray:
         offsets: np.ndarray = points[None, :, :] - centers[:, None, :]
         distances: np.ndarray = np.linalg.norm(offsets, axis=-1)
-        return distances - radii[:, None]
+        signed_distances = distances - radii[:, None]
+        return signed_distances
 
     return sdf
 
@@ -61,11 +62,41 @@ def rectangle(
 
         inside_mask: np.ndarray = (relative < 0).all(axis=-1)
 
-        distances: np.ndarray = np.where(
+        signed_distances: np.ndarray = np.where(
             inside_mask,
             np.max(relative, axis=-1),
             np.linalg.norm(np.maximum(relative, 0), axis=-1),
         )
-        return distances
+        return signed_distances
+
+    return sdf
+
+
+def triangle(vertices: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
+    """
+    vertices: shape (n, 3, 2)
+    """
+    vertices = vertices[:, :, None, :]
+
+    def sdf(points: np.ndarray) -> np.ndarray:
+        points = points[None, None, :, :]
+        edges: np.ndarray = np.roll(vertices, -1, axis=1) - vertices
+        vertices_to_points: np.ndarray = points - vertices
+        cross_products: np.ndarray = (
+            edges[:, :, :, 0] * vertices_to_points[:, :, :, 1]
+            - edges[:, :, :, 1] * vertices_to_points[:, :, :, 0]
+        )
+        dot_products: np.ndarray = np.sum(edges * vertices_to_points, axis=-1)
+        squared_edge_lengths: np.ndarray = np.sum(edges * edges, axis=-1)
+        edge_fractions: np.ndarray = np.clip(dot_products / squared_edge_lengths, 0, 1)
+        projections: np.ndarray = edge_fractions[:, :, :, None] * edges
+        distances: np.ndarray = np.linalg.norm(
+            vertices_to_points - projections, axis=-1
+        ).min(axis=1)
+        inside_mask: np.ndarray = (cross_products > 0).all(axis=1) | (
+            cross_products < 0
+        ).all(axis=1)
+        signed_distances: np.ndarray = np.where(inside_mask, -distances, distances)
+        return signed_distances
 
     return sdf
