@@ -26,7 +26,7 @@ def circle(
 
 
 def rectangle(
-    measurements: np.ndarray, centers: np.ndarray, rotations: np.ndarray
+    sizes: np.ndarray, centers: np.ndarray, angles: np.ndarray
 ) -> Callable[[np.ndarray], np.ndarray]:
     """Build a batched signed distance function for n rotated rectangles.
 
@@ -36,9 +36,9 @@ def rectangle(
     is an exact signed distance.
 
     Args:
-        measurements: Shape (n, 2), full width and height per rectangle.
+        sizes: Shape (n, 2), full width and height per rectangle.
         centers: Shape (n, 2), one center per rectangle.
-        rotations: Shape (n,), one angle per rectangle in radians,
+        angles: Shape (n,), one rotation angle per rectangle in radians,
             counterclockwise. An angle of 0 means axis-aligned.
 
     Returns:
@@ -47,7 +47,7 @@ def rectangle(
     """
 
     def sdf(points: np.ndarray) -> np.ndarray:
-        _cos, _sin = np.cos(-rotations), np.sin(-rotations)
+        _cos, _sin = np.cos(-angles), np.sin(-angles)
 
         rotation_matrices: np.ndarray = np.stack(
             [np.stack([_cos, -_sin], axis=-1), np.stack([_sin, _cos], axis=-1)],
@@ -57,7 +57,7 @@ def rectangle(
         offsets: np.ndarray = points[None, :, :] - centers[:, None, :]
         rotated: np.ndarray = np.einsum("nij,npj->npi", rotation_matrices, offsets)
         absolute: np.ndarray = np.abs(rotated)
-        relative: np.ndarray = absolute - (measurements[:, None, :] / 2)
+        relative: np.ndarray = absolute - (sizes[:, None, :] / 2)
 
         inside_mask: np.ndarray = (relative < 0).all(axis=-1)
 

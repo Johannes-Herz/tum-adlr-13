@@ -25,19 +25,19 @@ def generate(
         (n, resolution, resolution), (n, resolution, resolution), (n,)
         and (n, 2).
     """
-    measurements: np.ndarray = np.random.uniform(low=0, high=2, size=(n, 2))
+    sizes: np.ndarray = np.random.uniform(low=0, high=2, size=(n, 2))
     centers: np.ndarray = np.random.uniform(low=0, high=2, size=(n, 2))
-    rotations: np.ndarray = np.random.uniform(low=0, high=np.pi / 2, size=n)
+    angles: np.ndarray = np.random.uniform(low=0, high=np.pi / 2, size=n)
     sdf: Callable[[np.ndarray], np.ndarray] = rectangle_sdf(
-        measurements=measurements, centers=centers, rotations=rotations
+        sizes=sizes, centers=centers, angles=angles
     )
     sdf_grids: np.ndarray = rasterize(sdf=sdf, resolution=resolution)
     return (
         sdf_to_occupancy(sdf_grids=sdf_grids),
         sdf_grids,
-        measurements,
+        sizes,
         centers,
-        rotations,
+        angles,
     )
 
 
@@ -53,17 +53,17 @@ if __name__ == "__main__":
     (
         occupancy_grids,
         sdf_grids,
-        measurements,
+        sizes,
         centers,
-        rotations,
+        angles,
     ) = generate(n=args.number_of_samples, resolution=args.resolution)
     filepath: Path = save(
         shape="rectangle",
         occupancy_grids=occupancy_grids,
         sdf_grids=sdf_grids,
         resolution=args.resolution,
-        measurements=measurements,
+        sizes=sizes,
         centers=centers,
-        rotations=rotations,
+        angles=angles,
     )
     print(filepath)
