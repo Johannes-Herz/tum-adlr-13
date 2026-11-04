@@ -9,7 +9,7 @@ from tactex.shapes.sdf import circle as circle_sdf
 
 
 def generate(
-    n: int, resolution: int
+    n: int, resolution: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Generate occupancy grids of n circles centered at the origin.
 
@@ -38,11 +38,14 @@ if __name__ == "__main__":
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument("--resolution", type=int, required=True)
     parser.add_argument("--number-of-samples", type=int, required=True)
+    parser.add_argument("--seed", type=int, default=42)
 
     args: Namespace = parser.parse_args()
 
     occupancy_grids, sdf_grids, radii, centers = generate(
-        n=args.number_of_samples, resolution=args.resolution
+        n=args.number_of_samples,
+        resolution=args.resolution,
+        rng=np.random.default_rng(seed=args.seed),
     )
     filepath: Path = save(
         shape="circle",
