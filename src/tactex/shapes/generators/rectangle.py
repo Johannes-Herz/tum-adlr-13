@@ -9,25 +9,47 @@ from tactex.shapes.sdf import rectangle as rectangle_sdf
 
 
 def generate(
-    n: int, resolution: int
+    n: int, resolution: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Generate occupancy grids of n circles centered at the origin.
+    """Generate occupancy grids of n randomly sized, rotated and placed rectangles.
 
-    Radii are evenly spaced in (0, 1], i.e. 1/n, 2/n, ..., 1, so every circle
-    fits inside [-1, 1]^2.
+    Widths and heights are sampled uniformly in [0, 2], angles uniformly in
+    [0, pi/2). Rectangles whose rotated bounding box does not fit inside
+    [-1, 1]^2 are resampled. Each center is then sampled uniformly within the
+    range that keeps its rectangle fully inside the grid.
 
     Args:
-        n: Number of circles to generate.
+        n: Number of rectangles to generate.
         resolution: Number of cells per axis.
+        rng: Random number generator used for all sampling.
 
     Returns:
-        A tuple (occupancy_grids, sdf_grids, radii, centers) with shapes
-        (n, resolution, resolution), (n, resolution, resolution), (n,)
-        and (n, 2).
+        A tuple (occupancy_grids, sdf_grids, sizes, centers, angles) with shapes
+        (n, resolution, resolution), (n, resolution, resolution), (n, 2),
+        (n, 2) and (n,). Sizes are full width and height, angles are in
+        radians, counterclockwise.
     """
-    sizes: np.ndarray = np.random.uniform(low=0, high=2, size=(n, 2))
-    centers: np.ndarray = np.random.uniform(low=0, high=2, size=(n, 2))
-    angles: np.ndarray = np.random.uniform(low=0, high=np.pi / 2, size=n)
+    sizes: np.ndarray = rng.uniform(low=0, high=2, size=(n, 2))
+    angles: np.ndarray = rng.uniform(low=0, high=np.pi / 2, size=n)
+    MAX_RETRIES: int = 25
+    for _ in range(MAX_RETRIES):
+        half_sizes: np.ndarray = sizes / 2
+        c, s = np.abs(np.cos(angles)), np.abs(np.sin(angles))
+        ex, ey = (
+            c * half_sizes[:, 0] + s * half_sizes[:, 1],
+            s * half_sizes[:, 0] + c * half_sizes[:, 1],
+        )
+        bad: np.ndarray = (ex > 1) | (ey > 1)
+        if not bad.any():
+            break
+        k: int = bad.sum()
+        print(f"Resampling for {k} bad combinations")
+        sizes[bad] = rng.uniform(low=0, high=2, size=(k, 2))
+        angles[bad] = rng.uniform(low=0, high=np.pi / 2, size=(k))
+
+    cx, cy = rng.uniform(-1 + ex, 1 - ex), rng.uniform(-1 + ey, 1 - ey)
+    centers: np.ndarray = np.stack([cx, cy], axis=-1)
+
     sdf: Callable[[np.ndarray], np.ndarray] = rectangle_sdf(
         sizes=sizes, centers=centers, angles=angles
     )
@@ -47,6 +69,7 @@ if __name__ == "__main__":
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument("--resolution", type=int, required=True)
     parser.add_argument("--number-of-samples", type=int, required=True)
+    parser.add_argument("--seed", type=int, default=42)
 
     args: Namespace = parser.parse_args()
 
@@ -56,7 +79,11 @@ if __name__ == "__main__":
         sizes,
         centers,
         angles,
-    ) = generate(n=args.number_of_samples, resolution=args.resolution)
+    ) = generate(
+        n=args.number_of_samples,
+        resolution=args.resolution,
+        rng=np.random.default_rng(seed=args.seed),
+    )
     filepath: Path = save(
         shape="rectangle",
         occupancy_grids=occupancy_grids,
