@@ -1,11 +1,9 @@
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from tactex.shapes.grid import rasterize, sdf_to_occupancy
-from tactex.shapes.ioop import save
 from tactex.shapes.sdf import rectangle as rectangle_sdf
 
 
