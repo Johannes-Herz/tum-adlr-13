@@ -21,17 +21,17 @@ def main(args: Namespace):
         print(
             f"Generating {args.number_of_samples} datapoints for shape: '{shape}' with resolution {args.resolution}x{args.resolution}."
         )
-        occupancy_grids, sdf_grids, params = GENERATOR_MODULE_REGISTRY[shape].generate(
-            n=args.number_of_samples, resolution=args.resolution, rng=rng
-        )
+        occupancy_grids, sdf_grids, sample_params = GENERATOR_MODULE_REGISTRY[
+            shape
+        ].generate(n=args.number_of_samples, resolution=args.resolution, rng=rng)
         save(
-            shape=shape,
-            split=args.split,
+            generator=shape,
             occupancy_grids=occupancy_grids,
             sdf_grids=sdf_grids,
             resolution=args.resolution,
             seed=args.seed,
-            **params,
+            generator_params={},
+            sample_params=sample_params,
         )
 
 
@@ -49,9 +49,6 @@ if __name__ == "__main__":
         "--resolution", type=int, choices=[16, 32, 64, 128, 256, 512], required=True
     )
     parser.add_argument("--number-of-samples", type=int, required=True)
-    parser.add_argument(
-        "--split", type=str, choices=["train", "val", "test"], required=True
-    )
     parser.add_argument("--seed", type=int, default=42)
 
     args: Namespace = parser.parse_args()
