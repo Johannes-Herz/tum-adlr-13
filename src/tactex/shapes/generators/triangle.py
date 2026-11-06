@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -10,13 +11,14 @@ from tactex.shapes.sdf import triangle as triangle_sdf
 
 def generate(
     n: int, resolution: int, rng: np.random.Generator
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate occupancy grids of n random triangles.
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Generate n random triangles as SDF and occupancy grids.
 
     Each vertex is sampled uniformly in [-1, 1]^2, so every triangle lies
-    fully inside the grid. Degenerate triangles are resampled: those with an
-    area below 10 grid cells, or a smallest height (distance from a vertex to
-    its opposite edge) below 3 grid cells, which catches thin slivers.
+    fully inside the grid. Degenerate triangles are resampled, for at most
+    25 rounds: those with an area below 10 grid cells, or a smallest height
+    (distance from a vertex to its opposite edge) below 3 grid cells, which
+    catches thin slivers.
 
     Args:
         n: Number of triangles to generate.
@@ -24,9 +26,11 @@ def generate(
         rng: Random number generator used for all sampling.
 
     Returns:
-        A tuple (occupancy_grids, sdf_grids, vertices) with shapes
-        (n, resolution, resolution), (n, resolution, resolution) and
-        (n, 3, 2).
+        A tuple (occupancy_grids, sdf_grids, params):
+        - occupancy_grids: array of shape (n, resolution, resolution).
+        - sdf_grids: array of shape (n, resolution, resolution).
+        - params: dict with "vertices" of shape (n, 3, 2), the three
+          corner points of each triangle.
     """
     vertices: np.ndarray = rng.uniform(low=-1, high=1, size=(n, 3, 2))
     MAX_RETRIES: int = 25
@@ -49,30 +53,6 @@ def generate(
 
     sdf: Callable[[np.ndarray], np.ndarray] = triangle_sdf(vertices=vertices)
     sdf_grids: np.ndarray = rasterize(sdf=sdf, resolution=resolution)
-    return (sdf_to_occupancy(sdf_grids=sdf_grids), sdf_grids, vertices)
-
-
-if __name__ == "__main__":
-    from argparse import ArgumentParser, Namespace
-
-    parser: ArgumentParser = ArgumentParser()
-    parser.add_argument("--resolution", type=int, required=True)
-    parser.add_argument("--number-of-samples", type=int, required=True)
-    parser.add_argument("--seed", type=int, default=42)
-
-    args: Namespace = parser.parse_args()
-
-    (occupancy_grids, sdf_grids, vertices) = generate(
-        n=args.number_of_samples,
-        resolution=args.resolution,
-        rng=np.random.default_rng(seed=args.seed),
-    )
-    filepath: Path = save(
-        shape="triangle",
-        occupancy_grids=occupancy_grids,
-        sdf_grids=sdf_grids,
-        resolution=args.resolution,
-        seed=args.seed,
-        vertices=vertices,
-    )
-    print(filepath)
+    occupancy_grids: np.ndarray = sdf_to_occupancy(sdf_grids=sdf_grids)
+    params: dict[str, Any] = {"vertices": vertices}
+    return (occupancy_grids, sdf_grids, params)
