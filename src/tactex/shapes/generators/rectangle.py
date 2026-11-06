@@ -1,22 +1,22 @@
 from collections.abc import Callable
-from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 from tactex.shapes.grid import rasterize, sdf_to_occupancy
-from tactex.shapes.ioop import save
 from tactex.shapes.sdf import rectangle as rectangle_sdf
 
 
 def generate(
     n: int, resolution: int, rng: np.random.Generator
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Generate occupancy grids of n randomly sized, rotated and placed rectangles.
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Generate n randomly sized, rotated and placed rectangles as SDF and occupancy grids.
 
     Widths and heights are sampled uniformly in [0, 2], angles uniformly in
     [0, pi/2). Rectangles whose rotated bounding box does not fit inside
-    [-1, 1]^2 are resampled. Each center is then sampled uniformly within the
-    range that keeps its rectangle fully inside the grid.
+    [-1, 1]^2 are resampled, for at most 25 rounds. Each center is then
+    sampled uniformly within the range that keeps its rectangle fully inside
+    the grid.
 
     Args:
         n: Number of rectangles to generate.
@@ -24,10 +24,12 @@ def generate(
         rng: Random number generator used for all sampling.
 
     Returns:
-        A tuple (occupancy_grids, sdf_grids, sizes, centers, angles) with shapes
-        (n, resolution, resolution), (n, resolution, resolution), (n, 2),
-        (n, 2) and (n,). Sizes are full width and height, angles are in
-        radians, counterclockwise.
+        A tuple (occupancy_grids, sdf_grids, params):
+        - occupancy_grids: array of shape (n, resolution, resolution).
+        - sdf_grids: array of shape (n, resolution, resolution).
+        - params: dict with "sizes" of shape (n, 2) (full width and height),
+          "centers" of shape (n, 2) and "angles" of shape (n,) in radians,
+          counterclockwise.
     """
     sizes: np.ndarray = rng.uniform(low=0, high=2, size=(n, 2))
     angles: np.ndarray = rng.uniform(low=0, high=np.pi / 2, size=n)
@@ -54,44 +56,6 @@ def generate(
         sizes=sizes, centers=centers, angles=angles
     )
     sdf_grids: np.ndarray = rasterize(sdf=sdf, resolution=resolution)
-    return (
-        sdf_to_occupancy(sdf_grids=sdf_grids),
-        sdf_grids,
-        sizes,
-        centers,
-        angles,
-    )
-
-
-if __name__ == "__main__":
-    from argparse import ArgumentParser, Namespace
-
-    parser: ArgumentParser = ArgumentParser()
-    parser.add_argument("--resolution", type=int, required=True)
-    parser.add_argument("--number-of-samples", type=int, required=True)
-    parser.add_argument("--seed", type=int, default=42)
-
-    args: Namespace = parser.parse_args()
-
-    (
-        occupancy_grids,
-        sdf_grids,
-        sizes,
-        centers,
-        angles,
-    ) = generate(
-        n=args.number_of_samples,
-        resolution=args.resolution,
-        rng=np.random.default_rng(seed=args.seed),
-    )
-    filepath: Path = save(
-        shape="rectangle",
-        occupancy_grids=occupancy_grids,
-        sdf_grids=sdf_grids,
-        resolution=args.resolution,
-        seed=args.seed,
-        sizes=sizes,
-        centers=centers,
-        angles=angles,
-    )
-    print(filepath)
+    occupancy_grids: np.ndarray = sdf_to_occupancy(sdf_grids=sdf_grids)
+    params: dict[str, Any] = {"sizes": sizes, "centers": centers, "angles": angles}
+    return (occupancy_grids, sdf_grids, params)
