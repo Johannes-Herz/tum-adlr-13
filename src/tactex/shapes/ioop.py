@@ -1,12 +1,11 @@
 import json
-import warnings
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from tactex.paths import list_versions, new_versioned_dir, versioned_dir
+from tactex.paths import generator_dir, list_versions, new_versioned_dir, versioned_dir
 
 TIMESTAMP_FORMAT: str = "%Y%m%dT%H%M%SZ"
 
@@ -20,13 +19,12 @@ def _to_json(value: Any):
     return value
 
 
-def _does_seed_exist(generator: str, resolution: int, seed: int) -> bool:
-    """Return True if any complete version of this generator used this seed."""
-    versions: list[str] = list_versions(generator=generator, resolution=resolution)
+def _does_seed_exist(base_path: Path, seed: int) -> bool:
+    """Return True if any complete version of a generator used this seed."""
+    versions: list[str] = list_versions(base_path=base_path)
     for version in versions:
         metadata_filepath: Path = (
-            versioned_dir(generator=generator, resolution=resolution, version=version)
-            / "metadata.json"
+            versioned_dir(base_path=base_path, version=version) / "metadata.json"
         )
         if not metadata_filepath.is_file():
             continue
@@ -75,23 +73,24 @@ def save(
             raise ValueError(
                 f"sample_params[{key!r}] has length {len(value)}. Expected {N}."
             )
-    if _does_seed_exist(generator=generator, resolution=resolution, seed=seed):
+    base_path: Path = generator_dir(generator=generator, resolution=resolution)
+    if _does_seed_exist(base_path=base_path, seed=seed):
         raise ValueError(
             f"Seed {seed} was already used for generator {generator!r} at resolution "
             f"{resolution}. Use a new seed, or pass allow_seed_reuse=True if the "
             f"generator settings changed on purpose."
         )
 
-    base_path: Path = new_versioned_dir(generator=generator, resolution=resolution)
+    versioned_path: Path = new_versioned_dir(base_path=base_path)
 
-    np.save(base_path / "occupancy.npy", occupancy_grids.astype(bool))
-    np.save(base_path / "sdf.npy", sdf_grids.astype(np.float32))
-    np.savez(base_path / "sample_params.npz", **sample_params)
+    np.save(versioned_path / "occupancy.npy", occupancy_grids.astype(bool))
+    np.save(versioned_path / "sdf.npy", sdf_grids.astype(np.float32))
+    np.savez(versioned_path / "sample_params.npz", **sample_params)
 
     metadata: dict[str, Any] = {
         "format_version": 1,
         "generator": generator,
-        "version": base_path.name,
+        "version": versioned_path.name,
         "resolution": resolution,
         "seed": seed,
         "number_of_samples": int(occupancy_grids.shape[0]),
@@ -102,6 +101,6 @@ def save(
         },
         "created": datetime.now(tz=UTC).strftime(TIMESTAMP_FORMAT),
     }
-    with open(base_path / "metadata.json", "w") as file:
+    with open(versioned_path / "metadata.json", "w") as file:
         json.dump(obj=metadata, fp=file, indent=2, default=_to_json)
-    return base_path
+    return versioned_path
