@@ -59,7 +59,7 @@ def build_metrics(
 ) -> MetricCollection:
     """Build the metric collection for binary occupancy reconstruction.
 
-    All metrics take ``(logits, integer_targets)``. The classification metrics
+    All metrics take ``(logits, long_targets)``. The classification metrics
     refer to the occupied class, with logits turned into occupied/free by
     ``threshold`` on the sigmoid probability.
 

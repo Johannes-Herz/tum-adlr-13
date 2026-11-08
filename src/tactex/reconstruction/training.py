@@ -83,7 +83,7 @@ def train(
             loss.backward()
             optimizer.step()
 
-            train_tracker.update(logit_batch.detach(), y_batch.int())
+            train_tracker.update(logit_batch.detach(), y_batch.long())
             batch_tqdm.set_postfix(loss=f"{loss.item():.4f}")
 
         if lr_scheduler is not None:
