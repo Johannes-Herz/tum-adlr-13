@@ -5,6 +5,13 @@ from torch import nn
 
 
 class ConvBlock(nn.Module):
+    """Two 3x3-style convolutions, each followed by BatchNorm and ReLU.
+
+    Keeps the spatial size (padding ``kernel_size // 2``) and maps
+    ``in_channels`` to ``out_channels``. This is the swappable feature block of
+    the U-Net (e.g. for a residual block).
+    """
+
     def __init__(
         self,
         in_channels: int,
@@ -12,6 +19,14 @@ class ConvBlock(nn.Module):
         out_channels: int,
         kernel_size: int,
     ):
+        """
+        Args:
+            in_channels: Channels of the input.
+            hidden_channels: Channels between the two convolutions.
+            out_channels: Channels of the output.
+            kernel_size: Convolution kernel size; must be odd to keep the
+                spatial size.
+        """
         super().__init__()
 
         padding: int = kernel_size // 2
@@ -39,10 +54,16 @@ class ConvBlock(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Map ``(B, in_channels, H, W)`` to ``(B, out_channels, H, W)``."""
         return self.block(x)
 
 
 class DownBlock(nn.Module):
+    """Encoder step: 2x2 max pooling followed by a ``ConvBlock``.
+
+    Halves the spatial size and maps ``in_channels`` to ``out_channels``.
+    """
+
     def __init__(
         self,
         in_channels: int,
@@ -50,6 +71,13 @@ class DownBlock(nn.Module):
         out_channels: int,
         kernel_size: int,
     ):
+        """
+        Args:
+            in_channels: Channels of the input.
+            hidden_channels: Hidden channels of the ``ConvBlock``.
+            out_channels: Channels of the output.
+            kernel_size: Kernel size of the ``ConvBlock``.
+        """
         super().__init__()
 
         self.pool: nn.MaxPool2d = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
@@ -61,11 +89,20 @@ class DownBlock(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Map ``(B, in_channels, H, W)`` to ``(B, out_channels, H/2, W/2)``."""
         x = self.pool(x)
         return self.conv_block(x)
 
 
 class UpBlock(nn.Module):
+    """Decoder step: transposed convolution, skip concatenation, ``ConvBlock``.
+
+    Doubles the spatial size with a 2x2 transposed convolution
+    (``in_channels`` to ``out_channels``), concatenates the encoder skip
+    along the channels, and maps ``out_channels + skip_channels`` to
+    ``out_channels``.
+    """
+
     def __init__(
         self,
         in_channels: int,
@@ -74,6 +111,14 @@ class UpBlock(nn.Module):
         skip_channels: int,
         kernel_size: int,
     ):
+        """
+        Args:
+            in_channels: Channels of the input from the level below.
+            hidden_channels: Hidden channels of the ``ConvBlock``.
+            out_channels: Channels after upsampling and of the output.
+            skip_channels: Channels of the encoder skip tensor.
+            kernel_size: Kernel size of the ``ConvBlock``.
+        """
         super().__init__()
 
         self.upconv: nn.ConvTranspose2d = nn.ConvTranspose2d(
@@ -90,14 +135,46 @@ class UpBlock(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
+        """Upsample ``x`` and fuse it with ``skip``.
+
+        Args:
+            x: Tensor of shape ``(B, in_channels, H, W)``.
+            skip: Encoder tensor of shape ``(B, skip_channels, 2H, 2W)``.
+
+        Returns:
+            Tensor of shape ``(B, out_channels, 2H, 2W)``.
+        """
         x: torch.Tensor = self.upconv(x)
         return self.conv_block(torch.cat([x, skip], dim=1))
 
 
 class UNet(nn.Module):
+    """U-Net for image-to-image prediction with configurable depth and width.
+
+    One resolution level per entry in ``widths``: a ``ConvBlock`` stem at full
+    resolution, one ``DownBlock`` and one ``UpBlock`` per following level, skip
+    connections between matching levels, and a 1x1 convolution head.
+
+    The input height and width must be divisible by
+    ``2 ** (len(widths) - 1)``. The output has the same spatial size as the
+    input and contains logits (no final activation).
+    """
+
     def __init__(
-        self, in_channels: int, out_channels: int, widths: list[int], kernel_size: int
+        self,
+        in_channels: int,
+        out_channels: int,
+        widths: list[int],
+        kernel_size: int = 3,
     ):
+        """
+        Args:
+            in_channels: Channels of the input.
+            out_channels: Channels of the output (e.g. 1 for binary occupancy).
+            widths: Channels per resolution level, from full resolution to the
+                bottleneck, e.g. ``[32, 64, 128]``. Its length is the depth.
+            kernel_size: Kernel size of all ``ConvBlock``s; must be odd.
+        """
         super().__init__()
 
         self.stem: ConvBlock = ConvBlock(
@@ -136,6 +213,7 @@ class UNet(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Map ``(B, in_channels, H, W)`` to logits ``(B, out_channels, H, W)``."""
         x = self.stem(x)
         skips: list[torch.Tensor] = []
         for down_block in self.down_blocks:
