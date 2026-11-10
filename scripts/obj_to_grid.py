@@ -58,7 +58,7 @@ def generate_dataset_as_grid(
 
     # Default case: process only the first 5 objects in the category
     else:
-        for folder in sorted(category_dir.iterdir())[: 5 + 1]:
+        for folder in sorted(category_dir.iterdir())[: 15 + 1]:
             if folder.is_dir():
                 obj_path = (
                     category_dir / folder.name / "models" / "model_normalized.obj"
@@ -113,7 +113,7 @@ def obj_to_grid(mesh: trimesh.Trimesh, size: int = 64):
     max_scale = (size - 1 - 2 * padding) / extent
 
     # Random scaling between 70% and 100% of max_scale
-    scale = max_scale * np.random.uniform(0.7, 1.0)
+    scale = max_scale * np.random.uniform(0.6, 1.0)
 
     pixels = (vertices_2d - center) * scale  # center vertices around origin
     pixels += (size - 1) / 2  # shift to center of grid
@@ -153,7 +153,7 @@ def main():
     settings = get_settings()
     data_root = settings.data_root
     extracted_dir = data_root / "extracted" / "shapenet"
-    category = "02773838"
+    category = "03797390"
     all_objects = False
     specific_object = "1b9ef45fefefa35ed13f430b2941481"
     num_samples_per_obj = 5
