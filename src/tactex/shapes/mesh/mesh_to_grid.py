@@ -31,7 +31,7 @@ def load_shape_from_obj(obj_path: Path) -> trimesh.Trimesh:
 
 def mesh_to_grid(
     mesh: trimesh.Trimesh,
-    size: int = 64,
+    grid_size: int = 64,
     scale_range: tuple[float, float] = (0.6, 1.0),
     padding: int = 2,
     rng: np.random.Generator | None = None,
@@ -44,22 +44,22 @@ def mesh_to_grid(
 
     Args:
         mesh: 3D input mesh.
-        size: Grid width and height in pixels. Must be at least 2 * padding + 2.
+        grid_size: Grid width and height in pixels. Must be at least 2 * padding + 2.
         scale_range: Min and max scaling factors of the available grid span. Defautls to 60%-100%.
         padding: Padding defaults to 2.
         rng: Generator used for both rotation and scaling. If None, a new generator
             is created without a fixed seed.
 
     Returns:
-        mask: Array of shape (size, size) and dtype uint8. Coordinates are (y, x) and y points downwards to
+        mask: Array of shape (grid_size, grid_size) and dtype uint8. Coordinates are (y, x) and y points downwards to
             match image coordinates. Occupied pixels are 1; free pixels are 0.
 
     Raises:
-        ValueError: If size is too small, the mesh is empty, extended projection is smaller equals zero,
+        ValueError: If grid_size is too small, the mesh is empty, extended projection is smaller equals zero,
             scaling factors are invalid.
     """
 
-    if size <= 2 * padding + 1:
+    if grid_size <= 2 * padding + 1:
         raise ValueError(f"Grid size must be at least {2 * padding + 2} for padding.")
     if mesh.is_empty or len(mesh.faces) == 0:
         raise ValueError("Mesh must contain vertices and triangle faces.")
@@ -84,13 +84,13 @@ def mesh_to_grid(
     if extent <= 0:
         raise ValueError(f"Invalid extend value: {extent}.")
 
-    max_scale = (size - 1 - 2 * padding) / extent
+    max_scale = (grid_size - 1 - 2 * padding) / extent
     scale = max_scale * rng.uniform(scale_range[0], scale_range[1])
-    pixels = (vertices_2d - center) * scale + (size - 1) / 2
-    pixels[:, 1] = size - 1 - pixels[:, 1]  # Flip y-axis to match image coordinates
+    pixels = (vertices_2d - center) * scale + (grid_size - 1) / 2
+    pixels[:, 1] = grid_size - 1 - pixels[:, 1]  # Flip y-axis to match image coordinates
     pixels = np.round(pixels).astype(np.int32)
 
-    mask = np.zeros((size, size), dtype=np.uint8)
+    mask = np.zeros((grid_size, grid_size), dtype=np.uint8)
     for face in mesh.faces:
         cv2.fillConvexPoly(mask, pixels[face], 1)
     return mask

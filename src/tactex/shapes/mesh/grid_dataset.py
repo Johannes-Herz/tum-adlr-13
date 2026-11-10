@@ -13,7 +13,7 @@ def generate_grid_dataset(
     specific_object_id: str | None = None,
     max_objects: int = 15,
     all_objects: bool = False,
-    size: int = 64,
+    grid_size: int = 64,
     samples_per_object: int = 5,
     rng: np.random.Generator | None = None,
     scale_range: tuple[float, float] = (0.6, 1.0),
@@ -33,7 +33,7 @@ def generate_grid_dataset(
             Ignored if either all_objects is True and/or specific_object_id is not None.
         all_objects: Process every object in the category.
             Ignored if specific_object_id is not None.
-        size: Grid width and height in pixels. Defaults to 64. Must be at least 32.
+        grid_size: Grid width and height in pixels. Defaults to 64. Must be at least 32.
         samples_per_object: Positive number of projections per object, defaults to 5.
         rng: Generator shared by all samples for rotation and scaling. If None, a new generator
             is created without a fixed seed.
@@ -42,7 +42,7 @@ def generate_grid_dataset(
 
     Returns:
         output_path: Path to the saved .npz file. Its "masks" entry has shape
-            (num_objects * samples_per_object, size, size) and dtype uint8.
+            (num_objects * samples_per_object, grid_size, grid_size) and dtype uint8.
             An existing file for this category is overwritten.
 
     Raises:
@@ -62,7 +62,7 @@ def generate_grid_dataset(
         raise ValueError("max_objects must be positive.")
     if samples_per_object <= 0:
         raise ValueError("samples_per_object must be positive.")
-    if size < 32:
+    if grid_size < 32:
         raise ValueError("Grid size must be at least 32.")
 
     if extracted_dir is None:
@@ -94,7 +94,7 @@ def generate_grid_dataset(
         for _ in range(samples_per_object):
             masks.append(
                 mesh_to_grid(
-                    mesh, size=size, scale_range=scale_range, padding=padding, rng=rng
+                    mesh, grid_size=grid_size, scale_range=scale_range, padding=padding, rng=rng
                 )
             )
 
