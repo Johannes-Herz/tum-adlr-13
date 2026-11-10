@@ -94,12 +94,16 @@ def generate_grid_dataset(
         for _ in range(samples_per_object):
             masks.append(
                 mesh_to_grid(
-                    mesh, grid_size=grid_size, scale_range=scale_range, padding=padding, rng=rng
+                    mesh,
+                    grid_size=grid_size,
+                    scale_range=scale_range,
+                    padding=padding,
+                    rng=rng,
                 )
             )
 
     output_path = (
-        data_root / "full_grid" / "shapenet" / f"{category}_occupancy_grid_TEST.npz"
+        data_root / "full_grid" / "shapenet" / f"{category}_occupancy_grid.npz"
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output_path, masks=np.stack(masks, axis=0))
