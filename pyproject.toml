@@ -8,7 +8,12 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.5.4",
     "pydantic-settings>=2.16.2",
+    "pyyaml>=6.0.3",
+    "torch>=2.15.0",
+    "torchmetrics>=1.9.0",
+    "tqdm>=4.70.1",
 ]
 
 [project.scripts]
@@ -26,6 +31,7 @@ dev = [
     "ipykernel>=7.4.0",
     "ipympl>=0.10.0",
     "ipywidgets>=8.1.9",
+    "matplotlib>=3.11.2",
     "nbstripout>=0.9.1",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
