@@ -1,0 +1,18 @@
+# null uses the configured data_root from Settings (.env/environment).
+data_root: null
+category: "03797390"
+
+# null uses <data_root>/extracted/shapenet.
+extracted_dir: null
+specific_object_id: null
+max_objects: 15
+all_objects: false
+
+grid_size: 64
+samples_per_object: 5
+
+# null creates a generator without a fixed seed. For reproducibility: rng: {seed: 42}
+rng:
+  seed: 42
+scale_range: [0.6, 1.0]
+padding: 2
