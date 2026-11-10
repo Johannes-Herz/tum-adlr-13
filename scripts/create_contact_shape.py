@@ -1,5 +1,3 @@
-"""Combine ten ray observations of the first saved occupancy grid."""
-
 import argparse
 from pathlib import Path
 
