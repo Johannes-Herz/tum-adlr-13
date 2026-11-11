@@ -39,15 +39,24 @@ def main():
     rng = np.random.default_rng(config["seed"])
 
     contact_grid = np.full(grid.shape, -1, dtype=np.int8)
-    free_pixels = np.argwhere(grid == 0)
-    if len(free_pixels) == 0:
-        raise ValueError("The grid has no free pixels for ray origins.")
-    if grid.size < 2:
-        raise ValueError("At least two pixels are needed for a ray.")
+
+    if config["origin_pixel_edge"]:
+        if np.any(grid[[0, -1], :] != 0) or np.any(grid[:, [0, -1]] != 0):
+            raise ValueError(
+                "The grid needs to have zero padding for ray origins being on the edge."
+            )
+        edge_mask = np.zeros(grid.shape, dtype=bool)
+        edge_mask[[0, -1], :] = True
+        edge_mask[:, [0, -1]] = True
+        available_origin_pixels = np.argwhere(edge_mask)
+    else:
+        available_origin_pixels = np.argwhere(grid == 0)
+        if len(available_origin_pixels) == 0:
+            raise ValueError("The grid has no free pixels for ray origins.")
 
     for _ in range(config["num_rays"]):
         # The ray caster takes and returns coordinates in (row, column) order.
-        origin = free_pixels[rng.integers(len(free_pixels))]
+        origin = available_origin_pixels[rng.integers(len(available_origin_pixels))]
         # Use grid indices to make sure origin and goal of ray are note the same, with max one random draw
         origin_index = int(origin[0] * width + origin[1])
         goal_index = int(rng.integers(grid.size - 1))

@@ -1,3 +1,4 @@
 category: "03797390"
 seed: null
 num_rays: 10
+origin_pixel_edge: False
