@@ -5,7 +5,7 @@ import numpy as np
 from torchmetrics import MetricTracker
 
 
-def plot_history(
+def show(
     train_tracker: MetricTracker,
     val_tracker: MetricTracker,
     cols: int = 3,
