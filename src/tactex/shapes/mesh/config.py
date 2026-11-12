@@ -49,6 +49,12 @@ class DatasetShapenetConfig:
         if self.grid_size < 32:
             raise ValueError("Grid size must be at least 32.")
 
+        if self.data_root is not None:
+            self.data_root = Path(self.data_root)
+        if self.extracted_dir is not None:
+            self.extracted_dir = Path(self.extracted_dir)
+        self.scale_range = tuple(self.scale_range)
+
     @property
     def resolved_data_root(self) -> Path:
         """Dataset root used consistently for reading and saving grids."""
