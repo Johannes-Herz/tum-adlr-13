@@ -4,9 +4,11 @@ from pathlib import Path
 import numpy as np
 
 from tactex.shapes.mesh.mesh_to_grid import load_shape_from_obj, mesh_to_grid
+from tactex.shapes.storage import save_shapenet
 
 
 def generate_grid_dataset(
+    config: dict,
     data_root: Path,
     category: str,
     extracted_dir: Path | None = None,
@@ -22,7 +24,8 @@ def generate_grid_dataset(
     """Generate and save random projections of .obj files, from ShapeNet a category, as 2D occupancy grids.
 
     Args:
-        data_root: Dataset root. Results are written to full_grid/shapenet.
+        data_root: Dataset root. Each run is saved under
+            full_grid/shapenet/<category>/res<R>/<version>/, e.g. res064/v001.
         category: ShapeNet category identifier, e.g. "03797390".
         extracted_dir: Directory containing category folders. Defaults to
             data_root / "extracted" / "shapenet".
@@ -43,13 +46,15 @@ def generate_grid_dataset(
     Returns:
         output_path: Path to the saved .npz file. Its "masks" entry has shape
             (num_objects * samples_per_object, grid_size, grid_size) and dtype uint8.
-            An existing file for this category is overwritten.
+            Each run creates a new version folder, preserving previous runs.
+            metadata.json saves settings
 
     Raises:
         ValueError: If an argument is invalid, no objects are selected,
             or a mesh cannot be projected.
         FileNotFoundError: If a required directory or OBJ file is missing.
     """
+
     if not category:
         raise ValueError("A ShapeNet category is required.")
     if specific_object_id is not None and all_objects:
@@ -102,9 +107,8 @@ def generate_grid_dataset(
                 )
             )
 
-    output_path = (
-        data_root / "full_grid" / "shapenet" / f"{category}_occupancy_grid.npz"
-    )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(output_path, masks=np.stack(masks, axis=0))
+    masks_array = np.stack(masks, axis=0)
+
+    output_path = save_shapenet(masks=masks_array, config=config)
+
     return output_path

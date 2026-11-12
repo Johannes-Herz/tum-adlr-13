@@ -27,8 +27,8 @@ def main() -> None:
 
     data_root = config.get("data_root")
     extracted_dir = config.get("extracted_dir")
-    rng_config = config["rng"]
     output_path = generate_grid_dataset(
+        config=config,
         data_root=Path(data_root)
         if data_root is not None
         else get_settings().data_root,
@@ -39,8 +39,8 @@ def main() -> None:
         all_objects=config["all_objects"],
         grid_size=config["grid_size"],
         samples_per_object=config["samples_per_object"],
-        rng=np.random.default_rng(rng_config["seed"])
-        if rng_config is not None
+        rng=np.random.default_rng(config["seed"])
+        if config["seed"] is not None
         else None,
         scale_range=tuple(config["scale_range"]),
         padding=config["padding"],
