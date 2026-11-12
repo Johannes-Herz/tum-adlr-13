@@ -3,8 +3,8 @@ from pathlib import Path
 
 import numpy as np
 
+from tactex.shapes.ioop import save_shapenet
 from tactex.shapes.mesh.mesh_to_grid import load_shape_from_obj, mesh_to_grid
-from tactex.shapes.storage import save_shapenet
 
 
 def generate_grid_dataset(
