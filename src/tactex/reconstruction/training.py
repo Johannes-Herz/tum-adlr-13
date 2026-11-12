@@ -21,7 +21,7 @@ def train(
     epochs: int,
     device: torch.device,
     lr_scheduler: optim.lr_scheduler.LRScheduler | None = None,
-    log_fn: Callable[[dict[str, Any, int]], None] | None = None,
+    callback: Callable[[dict[str, Any, int]], None] | None = None,
 ) -> None:
     """Train a model and track training and validation metrics per epoch.
 
@@ -104,5 +104,5 @@ def train(
                 if k in ("train/loss", "val/loss", "val/iou_occ")
             }
         )
-        if log_fn is not None:
-            log_fn(results, epoch)
+        if callback is not None:
+            callback(results, epoch)
