@@ -33,7 +33,12 @@ def main():
             "Config must contain a YAML mapping of parameter names to values."
         )
 
-    grids = load_grid(category=config["category"], shapenet=True)
+    grids = load_grid(
+        category=config["category"],
+        shapenet=True,
+        resolution=config["dataset_resolution"],
+        version=config["dataset_version"],
+    )
     grid = grids[0, :, :]
     height, width = grid.shape
     rng = np.random.default_rng(config["seed"])
