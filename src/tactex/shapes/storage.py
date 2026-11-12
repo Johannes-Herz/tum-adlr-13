@@ -32,7 +32,7 @@ def save_shapenet(
     res_path = res_dir(base_path=category_path, resolution=config["grid_size"])
     output_path = new_versioned_dir(base_path=res_path)
     output_path.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(output_path / "occupancy_grid.npz")
+    np.savez_compressed(output_path / "occupancy_grid.npz", masks=masks)
 
     generation_params = config.copy()
     generation_params.pop("data_root", None)
