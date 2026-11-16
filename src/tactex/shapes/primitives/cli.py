@@ -8,11 +8,11 @@ from tactex.shapes import ioop
 from tactex.shapes.primitives import (
     GenerationConfig,
     SampleFunction,
-    SignedDistanceFunctionBuilder,
     generation,
     sampling,
     sdfs,
 )
+from tactex.typing import SignedDistanceFunctionBuilder
 
 
 def main(generation_config: GenerationConfig) -> dict[str, dict[str, Any]]:

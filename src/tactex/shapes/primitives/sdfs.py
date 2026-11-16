@@ -1,14 +1,11 @@
-from collections.abc import Callable
-from typing import Annotated
-
 import numpy as np
-import numpy.typing as npt
 
-type Points2D = Annotated[npt.NDArray[np.float32], "shape=(N, 2)"]
-type Distances = Annotated[npt.NDArray[np.float32], "shape=(N,)"]
-
-type SignedDistanceFunction = Callable[[Points2D], Distances]
-type SignedDistanceFunctionBuilder = Callable[..., SignedDistanceFunction]
+from tactex.typing import (
+    Distance,
+    Point2D,
+    SignedDistanceFunction,
+    SignedDistanceFunctionBuilder,
+)
 
 
 def circle(radii: np.ndarray, centers: np.ndarray) -> SignedDistanceFunction:
@@ -23,10 +20,10 @@ def circle(radii: np.ndarray, centers: np.ndarray) -> SignedDistanceFunction:
         shape (n, p): negative inside, zero on the boundary, positive outside.
     """
 
-    def sdf(points: np.ndarray) -> np.ndarray:
+    def sdf(points: Point2D) -> Distance:
         offsets: np.ndarray = points[None, :, :] - centers[:, None, :]
         distances: np.ndarray = np.linalg.norm(offsets, axis=-1)
-        signed_distances = distances - radii[:, None]
+        signed_distances: Distance = distances - radii[:, None]
         return signed_distances
 
     return sdf
@@ -53,7 +50,7 @@ def rectangle(
         shape (n, p): negative inside, zero on the boundary, positive outside.
     """
 
-    def sdf(points: np.ndarray) -> np.ndarray:
+    def sdf(points: Point2D) -> Distance:
         _cos, _sin = np.cos(-angles), np.sin(-angles)
 
         rotation_matrices: np.ndarray = np.stack(
@@ -68,7 +65,7 @@ def rectangle(
 
         inside_mask: np.ndarray = (relative < 0).all(axis=-1)
 
-        signed_distances: np.ndarray = np.where(
+        signed_distances: Distance = np.where(
             inside_mask,
             np.max(relative, axis=-1),
             np.linalg.norm(np.maximum(relative, 0), axis=-1),
@@ -97,7 +94,7 @@ def triangle(vertices: np.ndarray) -> SignedDistanceFunction:
     """
     vertices = vertices[:, :, None, :]
 
-    def sdf(points: np.ndarray) -> np.ndarray:
+    def sdf(points: Point2D) -> Distance:
         points = points[None, None, :, :]
         edges: np.ndarray = np.roll(vertices, -1, axis=1) - vertices
         vertices_to_points: np.ndarray = points - vertices
@@ -115,7 +112,7 @@ def triangle(vertices: np.ndarray) -> SignedDistanceFunction:
         inside_mask: np.ndarray = (cross_products > 0).all(axis=1) | (
             cross_products < 0
         ).all(axis=1)
-        signed_distances: np.ndarray = np.where(inside_mask, -distances, distances)
+        signed_distances: Distance = np.where(inside_mask, -distances, distances)
         return signed_distances
 
     return sdf

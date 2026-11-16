@@ -1,15 +1,10 @@
-from typing import Annotated
-
 import numpy as np
-import numpy.typing as npt
 
 from tactex.shapes.primitives.config import GridConfig
-from tactex.shapes.primitives.sdfs import Points2D, SignedDistanceFunction
-
-type Grid2D = Annotated[npt.NDArray[np.float32], "shape=(H, W)"]
+from tactex.typing import OccupancyGrid2D, Point2D, SDFGrid2D, SignedDistanceFunction
 
 
-def _make_coords(grid_config: GridConfig) -> Points2D:
+def _make_coords(grid_config: GridConfig) -> Point2D:
     """Generate the cell-center coordinates of a regular 2D grid over [-1, 1]^2.
 
     The grid is split into `resolution` equal cells per axis, and one point is
@@ -27,11 +22,11 @@ def _make_coords(grid_config: GridConfig) -> Points2D:
     )
     steps: np.ndarray = (linspace[1:] + linspace[:-1]) / 2
     grid: np.ndarray = np.meshgrid(*([steps] * 2), indexing="ij")
-    points: Points2D = np.stack(grid, axis=-1).reshape(-1, 2)
+    points: Point2D = np.stack(grid, axis=-1).reshape(-1, 2)
     return points
 
 
-def rasterize(sdf: SignedDistanceFunction, grid_config: GridConfig) -> Grid2D:
+def rasterize(sdf: SignedDistanceFunction, grid_config: GridConfig) -> SDFGrid2D:
     """Sample a signed distance function on a regular 2D grid over [-1, 1]^2.
 
     Evaluates `sdf` at every cell center and reshapes the result into a grid.
@@ -46,14 +41,14 @@ def rasterize(sdf: SignedDistanceFunction, grid_config: GridConfig) -> Grid2D:
         Signed distances of shape (..., resolution, resolution), indexed as
         [x, y]. Transpose the last two axes for image-style [row, col] display.
     """
-    points: Points2D = _make_coords(grid_config=grid_config)
+    points: Point2D = _make_coords(grid_config=grid_config)
     sdf_values: np.ndarray = sdf(points)
     return sdf_values.reshape(*sdf_values.shape[:-1], *([grid_config.resolution] * 2))
 
 
 def sdf_to_occupancy(
-    sdf_grids: Grid2D,
-) -> Grid2D:
+    sdf_grids: SDFGrid2D,
+) -> OccupancyGrid2D:
     """Convert a signed distance grid into a binary occupancy grid.
 
     Uses the center rule: a cell is occupied if the signed distance at its
