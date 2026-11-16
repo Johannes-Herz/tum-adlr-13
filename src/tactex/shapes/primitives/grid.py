@@ -1,9 +1,15 @@
-from collections.abc import Callable
+from typing import Annotated
 
 import numpy as np
+import numpy.typing as npt
+
+from tactex.shapes.primitives.config import GridConfig
+from tactex.shapes.primitives.sdfs import Points2D, SignedDistanceFunction
+
+type Grid2D = Annotated[npt.NDArray[np.float32], "shape=(H, W)"]
 
 
-def make_coords(resolution: int) -> np.ndarray:
+def _make_coords(grid_config: GridConfig) -> Points2D:
     """Generate the cell-center coordinates of a regular 2D grid over [-1, 1]^2.
 
     The grid is split into `resolution` equal cells per axis, and one point is
@@ -16,14 +22,16 @@ def make_coords(resolution: int) -> np.ndarray:
     Returns:
         Points of shape (resolution**2, 2).
     """
-    linspace: np.ndarray = np.linspace(-1, 1, resolution + 1)
+    linspace: np.ndarray = np.linspace(
+        grid_config.min_coord, grid_config.max_coord, grid_config.resolution + 1
+    )
     steps: np.ndarray = (linspace[1:] + linspace[:-1]) / 2
     grid: np.ndarray = np.meshgrid(*([steps] * 2), indexing="ij")
-    points: np.ndarray = np.stack(grid, axis=-1).reshape(-1, 2)
+    points: Points2D = np.stack(grid, axis=-1).reshape(-1, 2)
     return points
 
 
-def rasterize(sdf: Callable[[np.ndarray], np.ndarray], resolution: int) -> np.ndarray:
+def rasterize(sdf: SignedDistanceFunction, grid_config: GridConfig) -> Grid2D:
     """Sample a signed distance function on a regular 2D grid over [-1, 1]^2.
 
     Evaluates `sdf` at every cell center and reshapes the result into a grid.
@@ -38,14 +46,14 @@ def rasterize(sdf: Callable[[np.ndarray], np.ndarray], resolution: int) -> np.nd
         Signed distances of shape (..., resolution, resolution), indexed as
         [x, y]. Transpose the last two axes for image-style [row, col] display.
     """
-    points: np.ndarray = make_coords(resolution=resolution)
+    points: Points2D = _make_coords(grid_config=grid_config)
     sdf_values: np.ndarray = sdf(points)
-    return sdf_values.reshape(*sdf_values.shape[:-1], *([resolution] * 2))
+    return sdf_values.reshape(*sdf_values.shape[:-1], *([grid_config.resolution] * 2))
 
 
 def sdf_to_occupancy(
-    sdf_grids: np.ndarray,
-) -> np.ndarray:
+    sdf_grids: Grid2D,
+) -> Grid2D:
     """Convert a signed distance grid into a binary occupancy grid.
 
     Uses the center rule: a cell is occupied if the signed distance at its

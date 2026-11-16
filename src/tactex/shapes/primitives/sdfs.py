@@ -1,11 +1,17 @@
 from collections.abc import Callable
+from typing import Annotated
 
 import numpy as np
+import numpy.typing as npt
+
+type Points2D = Annotated[npt.NDArray[np.float32], "shape=(N, 2)"]
+type Distances = Annotated[npt.NDArray[np.float32], "shape=(N,)"]
+
+type SignedDistanceFunction = Callable[[Points2D], Distances]
+type SignedDistanceFunctionBuilder = Callable[..., SignedDistanceFunction]
 
 
-def circle(
-    radii: np.ndarray, centers: np.ndarray
-) -> Callable[[np.ndarray], np.ndarray]:
+def circle(radii: np.ndarray, centers: np.ndarray) -> SignedDistanceFunction:
     """Build a batched signed distance function for n circles.
 
     Args:
@@ -28,7 +34,7 @@ def circle(
 
 def rectangle(
     sizes: np.ndarray, centers: np.ndarray, angles: np.ndarray
-) -> Callable[[np.ndarray], np.ndarray]:
+) -> SignedDistanceFunction:
     """Build a batched signed distance function for n rotated rectangles.
 
     Each point is moved into the rectangle's local frame (shifted by the
@@ -72,7 +78,7 @@ def rectangle(
     return sdf
 
 
-def triangle(vertices: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
+def triangle(vertices: np.ndarray) -> SignedDistanceFunction:
     """Build a batched signed distance function for n triangles.
 
     The distance is the minimum distance from a point to the three edge
@@ -113,3 +119,10 @@ def triangle(vertices: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
         return signed_distances
 
     return sdf
+
+
+REGISTRY: dict[str, SignedDistanceFunctionBuilder] = {
+    "circle": circle,
+    "rectangle": rectangle,
+    "triangle": triangle,
+}
