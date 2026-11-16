@@ -7,6 +7,29 @@ from tactex.shapes.grid import rasterize, sdf_to_occupancy
 from tactex.shapes.sdf import rectangle as rectangle_sdf
 
 
+def sample(
+    n: int, rng: np.random.Generator, max_retries: int = 25
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    sizes: np.ndarray = rng.uniform(low=0, high=2, size=(n, 2))
+    angles: np.ndarray = rng.uniform(low=0, high=np.pi / 2, size=n)
+    for _ in range(max_retries):
+        half_sizes: np.ndarray = sizes / 2
+        c, s = np.abs(np.cos(angles)), np.abs(np.sin(angles))
+        ex, ey = (
+            c * half_sizes[:, 0] + s * half_sizes[:, 1],
+            s * half_sizes[:, 0] + c * half_sizes[:, 1],
+        )
+        bad: np.ndarray = (ex > 1) | (ey > 1)
+        if not bad.any():
+            break
+        k: int = bad.sum()
+        sizes[bad] = rng.uniform(low=0, high=2, size=(k, 2))
+        angles[bad] = rng.uniform(low=0, high=np.pi / 2, size=(k))
+    cx, cy = rng.uniform(-1 + ex, 1 - ex), rng.uniform(-1 + ey, 1 - ey)
+    centers: np.ndarray = np.stack([cx, cy], axis=-1)
+    return centers, sizes, angles
+
+
 def generate(
     n: int, resolution: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
@@ -31,27 +54,7 @@ def generate(
           "centers" of shape (n, 2) and "angles" of shape (n,) in radians,
           counterclockwise.
     """
-    sizes: np.ndarray = rng.uniform(low=0, high=2, size=(n, 2))
-    angles: np.ndarray = rng.uniform(low=0, high=np.pi / 2, size=n)
-    MAX_RETRIES: int = 25
-    for _ in range(MAX_RETRIES):
-        half_sizes: np.ndarray = sizes / 2
-        c, s = np.abs(np.cos(angles)), np.abs(np.sin(angles))
-        ex, ey = (
-            c * half_sizes[:, 0] + s * half_sizes[:, 1],
-            s * half_sizes[:, 0] + c * half_sizes[:, 1],
-        )
-        bad: np.ndarray = (ex > 1) | (ey > 1)
-        if not bad.any():
-            break
-        k: int = bad.sum()
-        print(f"Resampling for {k} bad combinations")
-        sizes[bad] = rng.uniform(low=0, high=2, size=(k, 2))
-        angles[bad] = rng.uniform(low=0, high=np.pi / 2, size=(k))
-
-    cx, cy = rng.uniform(-1 + ex, 1 - ex), rng.uniform(-1 + ey, 1 - ey)
-    centers: np.ndarray = np.stack([cx, cy], axis=-1)
-
+    centers, sizes, angles = sample(n=n, rng=rng)
     sdf: Callable[[np.ndarray], np.ndarray] = rectangle_sdf(
         sizes=sizes, centers=centers, angles=angles
     )

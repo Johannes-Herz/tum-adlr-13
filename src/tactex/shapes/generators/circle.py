@@ -7,6 +7,14 @@ from tactex.shapes.grid import rasterize, sdf_to_occupancy
 from tactex.shapes.sdf import circle as circle_sdf
 
 
+def sample(n: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
+    radii: np.ndarray = rng.uniform(low=0, high=1, size=n)
+    centers: np.ndarray = rng.uniform(
+        low=-1 + radii[:, None], high=1 - radii[:, None], size=(n, 2)
+    )
+    return centers, radii
+
+
 def generate(
     n: int, resolution: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
@@ -29,10 +37,7 @@ def generate(
         - sdf_grids: float array of shape (n, resolution, resolution).
         - params: dict with "radii" of shape (n,) and "centers" of shape (n, 2).
     """
-    radii: np.ndarray = rng.uniform(low=0, high=1, size=n)
-    centers: np.ndarray = rng.uniform(
-        low=-1 + radii[:, None], high=1 - radii[:, None], size=(n, 2)
-    )
+    centers, radii = sample(n=n, resolution=resolution, rng=rng)
     sdf: Callable[[np.ndarray], np.ndarray] = circle_sdf(radii=radii, centers=centers)
     sdf_grids: np.ndarray = rasterize(sdf=sdf, resolution=resolution)
     occupancy_grids: np.ndarray = sdf_to_occupancy(sdf_grids=sdf_grids)
