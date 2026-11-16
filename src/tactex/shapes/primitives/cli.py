@@ -17,7 +17,6 @@ from tactex.shapes.primitives import (
 
 def main(generation_config: GenerationConfig) -> dict[str, dict[str, Any]]:
     rng: np.random.Generator = np.random.default_rng(seed=generation_config.seed)
-    print(generation_config.model_dump_json(indent=2))
 
     generations: dict[str, dict[str, Any]] = {}
     for primitive_config in generation_config.primitive_configs:
