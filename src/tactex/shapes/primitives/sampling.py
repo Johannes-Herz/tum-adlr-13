@@ -11,9 +11,11 @@ from tactex.shapes.primitives.config import (
 )
 
 type SampleParams = dict[str, np.ndarray]
+"""Dictionary mapping parameter names (e.g. `"centers"`, `"radii"`) to batched arrays of shape `(B, ...)`."""
 type SampleFunction = Callable[
     [PrimitiveConfig, GridConfig, np.random.Generator], SampleParams
 ]
+"""Callable that samples a batch of primitive parameters given primitive and grid configurations."""
 
 
 def circle(
@@ -125,7 +127,7 @@ def triangle(
     return {"vertices": vertices}
 
 
-REGISTRY: dict[str, Callable] = {
+REGISTRY: dict[str, SampleFunction] = {
     "circle": circle,
     "rectangle": rectangle,
     "triangle": triangle,
