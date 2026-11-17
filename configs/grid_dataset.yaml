@@ -6,11 +6,16 @@ category: "03797390"
 extracted_dir: null
 specific_object_id: null
 max_objects: 15
-all_objects: false
+all_objects: true
 
 grid_size: 64
-samples_per_object: 5
+samples_per_object: 23
 
 seed: 42
 scale_range: [0.6, 1.0]
 padding: 2
+
+
+### Note ###
+# Shapes are saved in order, i.e. the first "samples_per_object" many shapes belong to the same original shape
+#######

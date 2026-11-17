@@ -1,5 +1,5 @@
 # Relative paths are resolved against data_root from Settings.
-npz_path: "full_grid/shapenet/03797390/res064/v005/occupancy_grid.npz"
+npz_path: "partial_grid/shapenet/03797390/res064/v001/partial_grid.npz"
 
 # null saves a PNG next to the input file with the same name.
 output_path: null
