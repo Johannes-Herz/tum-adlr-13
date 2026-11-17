@@ -80,14 +80,19 @@ def mesh_to_grid(
     max_coords = vertices_2d.max(axis=0)
 
     center = (min_coords + max_coords) / 2
-    extent = (max_coords - min_coords).max()
-    if extent <= 0:
-        raise ValueError(f"Invalid extend value: {extent}.")
 
-    max_scale = (grid_size - 1 - 2 * padding) / extent
+    centered_vertices = vertices_2d - center
+    object_radius = np.linalg.norm(centered_vertices, axis=1).max()
+
+    if object_radius <= 0:
+        raise ValueError(f"Invalid object radius: {object_radius}.")
+
+    max_scale = ((grid_size - 1) / 2 - padding) / object_radius
     scale = max_scale * rng.uniform(scale_range[0], scale_range[1])
     pixels = (vertices_2d - center) * scale + (grid_size - 1) / 2
-    pixels[:, 1] = grid_size - 1 - pixels[:, 1]  # Flip y-axis to match image coordinates
+    pixels[:, 1] = (
+        grid_size - 1 - pixels[:, 1]
+    )  # Flip y-axis to match image coordinates
     pixels = np.round(pixels).astype(np.int32)
 
     mask = np.zeros((grid_size, grid_size), dtype=np.uint8)
