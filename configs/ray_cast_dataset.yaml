@@ -1,0 +1,10 @@
+category: "03797390"
+dataset_version: 1
+dataset_resolution: 64
+
+partials_per_grid: 10
+min_rays: 1
+max_rays: 15
+seed: 42
+# false: any free pixel; true: only pixels on the free grid border.
+origin_pixel_edge: true

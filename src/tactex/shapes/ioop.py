@@ -14,6 +14,7 @@ from tactex.paths import (
     res_dir,
     versioned_dir,
 )
+from tactex.settings import get_settings
 from tactex.shapes.mesh.config import DatasetShapenetConfig
 
 TIMESTAMP_FORMAT: str = "%Y%m%dT%H%M%SZ"
@@ -150,5 +151,72 @@ def save_shapenet(
 
     with (output_path / "metadata.json").open("w", encoding="utf-8") as file:
         json.dump(obj=metadata, fp=file, indent=2, default=_to_json)
+        file.write("\n")
+    return output_path
+
+
+def save_partial_shapenet(
+    masks: np.ndarray,
+    ray_counts: np.ndarray,
+    config: dict[str, Any],
+    num_input_grids: int,
+) -> Path:
+    """
+    Save ordered partial grids and metadata under partial_grid/shapenet/....
+
+    Creates a new version without overwriting existing runs. The archive's
+    masks array has shape (num_input_grids * partials_per_grid, H, W).
+    """
+
+    resolution = config["dataset_resolution"]
+    partials_per_grid = config["partials_per_grid"]
+    num_partials = num_input_grids * partials_per_grid
+    if masks.shape != (num_partials, resolution, resolution):
+        raise ValueError("Partial masks shape does not match the generation settings.")
+    if ray_counts.shape != (num_partials,):
+        raise ValueError("Require one ray count per partial grid.")
+
+    category_path = (
+        get_settings().data_root / "partial_grid" / "shapenet" / config["category"]
+    )
+    output_path = new_versioned_dir(res_dir(category_path, resolution))
+    source_grid_indices = np.repeat(np.arange(num_input_grids), partials_per_grid)
+    np.savez_compressed(
+        output_path / "partial_grid.npz",
+        masks=masks,
+        ray_counts=ray_counts,
+        source_grid_indices=source_grid_indices,
+    )
+    source_path = (
+        category_dir(source="shapenet", category=config["category"], full_grid=True)
+        / f"res{resolution:03d}"
+        / f"v{config['dataset_version']:03d}"
+        / "occupancy_grid.npz"
+    )
+    metadata = {
+        **config,
+        "version": output_path.name,
+        "source_path": str(source_path),
+        "source_version": f"v{config['dataset_version']:03d}",
+        "num_input_grids": num_input_grids,
+        "number_of_samples": num_partials,
+        "ordering": "Input grid i maps to masks[i * partials_per_grid, (i + 1) * partials_per_grid].",
+        "ray_count_sampling": "Uniform integers from min_rays to max_rays, inclusive; independently per partial.",
+        "values": {"unknown": -1, "observed_free": 0, "observed_occupied": 1},
+        "arrays": {
+            "masks": {"shape": list(masks.shape), "dtype": str(masks.dtype)},
+            "ray_counts": {
+                "shape": list(ray_counts.shape),
+                "dtype": str(ray_counts.dtype),
+            },
+            "source_grid_indices": {
+                "shape": list(source_grid_indices.shape),
+                "dtype": str(source_grid_indices.dtype),
+            },
+        },
+        "created": datetime.now(tz=UTC).strftime(TIMESTAMP_FORMAT),
+    }
+    with (output_path / "metadata.json").open("w", encoding="utf-8") as file:
+        json.dump(metadata, file, indent=2, default=_to_json)
         file.write("\n")
     return output_path
