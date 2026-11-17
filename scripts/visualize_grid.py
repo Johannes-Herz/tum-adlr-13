@@ -1,7 +1,9 @@
 import argparse
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 import numpy as np
 import yaml
 
@@ -14,6 +16,8 @@ def save_grid_preview(
     max_masks: int = 80,
     columns: int = 5,
     dpi: int = 150,
+    circle_padding: int | None = None,
+    circle_color: str = "tab:orange",
 ) -> Path:
     """Save the first occupancy grids in a .npz file as a tiled PNG preview.
 
@@ -24,6 +28,9 @@ def save_grid_preview(
         max_masks: Maximum number of grids to display. Must be positive.
         columns: Maximum number of columns in the preview. Must be positive.
         dpi: Output image resolution in dots per inch. Must be positive.
+        circle_padding: Circle padding in pixels. None reads padding from the
+            adjacent metadata.json, falling back to 2 if unavailable.
+        circle_color: Matplotlib color of the circle outline.
 
     Returns:
         Path to the saved preview image.
@@ -45,6 +52,18 @@ def save_grid_preview(
             f"Expected nonempty masks with shape (N, H, W), got {masks.shape}."
         )
 
+    if circle_padding is None:
+        metadata_path = npz_path.with_name("metadata.json")
+        if metadata_path.is_file():
+            with metadata_path.open(encoding="utf-8") as file:
+                circle_padding = json.load(file).get("padding", 2)
+        else:
+            circle_padding = 2
+    height, width = masks.shape[1:]
+    circle_radius = (min(height, width) - 1) / 2 - circle_padding
+    if circle_padding < 0 or circle_radius <= 0:
+        raise ValueError("Circle padding must be nonnegative and leave a positive radius.")
+
     if output_path is None:
         output_path = npz_path.with_suffix(".png")
     if output_path.resolve() == npz_path.resolve():
@@ -61,6 +80,15 @@ def save_grid_preview(
             if index < count:
                 ax.imshow(
                     masks[index], cmap="gray", vmin=0, vmax=1, interpolation="nearest"
+                )
+                ax.add_patch(
+                    Circle(
+                        ((width - 1) / 2, (height - 1) / 2),
+                        circle_radius,
+                        fill=False,
+                        edgecolor=circle_color,
+                        linewidth=1.2,
+                    )
                 )
                 ax.set_title(f"Mask {index}")
             ax.axis("off")
@@ -108,6 +136,8 @@ def main() -> None:
         max_masks=config["max_masks"],
         columns=config["columns"],
         dpi=config["dpi"],
+        circle_padding=config.get("circle_padding"),
+        circle_color=config.get("circle_color", "tab:orange"),
     )
     print(f"Saved preview to {saved_path}")
 

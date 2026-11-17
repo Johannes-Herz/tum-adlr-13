@@ -11,6 +11,24 @@ def raw_dir(source: str) -> Path:
     return get_settings().data_root / "raw" / source
 
 
+def category_dir(
+    source: str, category: str, full_grid: bool = False, extracted: bool = False
+) -> Path:
+    """e.g. full_grid_dir("shapenet) -> <data_root>/full_grid/shapenet
+    source: is source of data, e.g. shapenet"""
+    if full_grid == extracted:
+        raise ValueError("'full_grid' and 'extracted' must not both be True or False.")
+    if full_grid:
+        return get_settings().data_root / "full_grid" / source / category
+    else:
+        return get_settings().data_root / "extracted" / source / category
+
+
+def res_dir(base_path: Path, resolution: int) -> Path:
+    """e.g. resr_dir("base_path", 64) -> base_path/res064"""
+    return base_path / f"res{resolution:03d}"
+
+
 def generator_dir(generator: str, resolution: int) -> Path:
     """e.g. generator_dir("circles", 64) -> <data_root>/generated/circles/res064"""
     return get_settings().data_root / "generated" / generator / f"res{resolution:03d}"

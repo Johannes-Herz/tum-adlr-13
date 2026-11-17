@@ -1,9 +1,14 @@
 import numpy as np
 
-from tactex.settings import get_settings
+from tactex.paths import category_dir, res_dir
 
 
-def load_grid(category: str | None = None, shapenet: bool = False) -> np.ndarray:
+def load_grid(
+    category: str | None = None,
+    shapenet: bool = False,
+    resolution: int | None = None,
+    version: int | None = None,
+) -> np.ndarray:
     """Load a category's binary occupancy grids from a .npz file.
     Currently only supports shapenet files.
 
@@ -26,11 +31,19 @@ def load_grid(category: str | None = None, shapenet: bool = False) -> np.ndarray
         raise ValueError("Currently only ShapeNet is supported for loading grids.")
     if not category:
         raise ValueError("A category is required to load ShapeNet grids.")
+    if resolution is None or resolution <= 0:
+        raise ValueError("A resolution is required to load ShapeNet grids.")
 
-    data_root = get_settings().data_root
-    category_path = (
-        data_root / "full_grid" / "shapenet" / f"{category}_occupancy_grid.npz"
+    category_path = category_dir(
+        source="shapenet", category=category, full_grid=True, extracted=False
     )
+    res_path = res_dir(base_path=category_path, resolution=resolution)
+    input_path = res_path / f"v{version:03d}" / "occupancy_grid.npz"
 
-    with np.load(category_path) as data:
+    if not input_path.is_file():
+        raise ValueError(f"File not found: {input_path}")
+    else:
+        print(input_path)
+
+    with np.load(input_path) as data:
         return data["masks"]

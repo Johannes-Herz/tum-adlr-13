@@ -11,8 +11,6 @@ all_objects: false
 grid_size: 64
 samples_per_object: 5
 
-# null creates a generator without a fixed seed. For reproducibility: rng: {seed: 42}
-rng:
-  seed: 42
+seed: 42
 scale_range: [0.6, 1.0]
 padding: 2
