@@ -1,5 +1,5 @@
 # Relative paths are resolved against data_root from Settings.
-npz_path: "full_grid/shapenet/03797390_occupancy_grid.npz"
+npz_path: "full_grid/shapenet/03797390/res064/v005/occupancy_grid.npz"
 
 # null saves a PNG next to the input file with the same name.
 output_path: null
@@ -7,3 +7,7 @@ output_path: null
 max_masks: 40
 columns: 5
 dpi: 150
+
+# null reads padding from the dataset's metadata.json (fallback: 2 pixels).
+circle_padding: null
+circle_color: "tab:orange"
