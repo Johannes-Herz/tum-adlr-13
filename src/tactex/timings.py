@@ -9,7 +9,6 @@ import torch
 
 from tactex.settings import get_settings
 
-
 type Unit = Literal["ms", "s"]
 
 
@@ -17,7 +16,7 @@ type Unit = Literal["ms", "s"]
 class Timings:
     data: dict[str, list[float]] = field(default_factory=dict)
 
-    def add(self, fn_name: str, elapsed_in_ns: float) -> None:
+    def add(self, fn_name: str, elapsed_in_ns: int) -> None:
         if fn_name not in self.data:
             self.data[fn_name] = []
         self.data[fn_name].append(elapsed_in_ns)
@@ -30,10 +29,10 @@ class Timings:
         }
 
     def stats(self, unit: Unit) -> dict[str, dict[str, int | float]]:
-        factor: float = 1_000 if unit == "ms" else 1_000_000
+        factor: float = 1_000_000 if unit == "ms" else 1_000_000_000
         return {
             fn_name: {
-                "count": len(timings) / factor,
+                "count": len(timings),
                 "total": sum(timings) / factor,
                 "mean": statistics.mean(timings) / factor,
                 "median": statistics.median(timings) / factor,
@@ -86,7 +85,7 @@ class Timings:
         return "\n".join([fmt(headers), "-" * len(fmt(headers)), *map(fmt, rows)])
 
     def __str__(self) -> str:
-        return self._to_table()
+        return self._to_table(unit="ms")
 
 
 TIMINGS: Timings = Timings()
@@ -122,7 +121,7 @@ def timed():
                 _sync()
                 TIMINGS.add(
                     fn_name=fn_name,
-                    elapsed_in_ms=(time.perf_counter_ns() - start_time_ns),
+                    elapsed_in_ns=(time.perf_counter_ns() - start_time_ns),
                 )
 
         return wrapper
