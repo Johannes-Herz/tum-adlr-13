@@ -16,6 +16,7 @@ type Unit = Literal["ms", "s"]
 @dataclass()
 class Timings:
     data: dict[str, list[float]] = field(default_factory=dict)
+    worker_keys: set[str] = field(default_factory=set)
 
     def add(self, fn_name: str, elapsed_ns: int) -> None:
         if fn_name not in self.data:
@@ -37,6 +38,7 @@ class Timings:
     def merge(self, other: dict[str, list[int]]) -> None:
         for k, v in other.items():
             self.data.setdefault(k, []).extend(v)
+            self.worker_keys.add(k)
 
     def stats(self, unit: Unit) -> dict[str, dict[str, int | float]]:
         factor: float = 1_000_000 if unit == "ms" else 1_000_000_000
@@ -57,7 +59,14 @@ class Timings:
 
     def _to_table(self, unit: Unit, decimals: int = 4) -> str:
         stats: dict[str, dict[str, float]] = self.stats(unit=unit)
-        total: float = sum(fn_stats["total"] for fn_stats in stats.values())
+        main = {k: s for k, s in stats.items() if k not in self.worker_keys}
+        base = max((s["total"] for s in main.values()), default=0.0)
+
+        def pct(name, s):
+            if name in self.worker_keys or base == 0:
+                return "-"
+            return f"{100 * s['total'] / base:.1f}"
+
         headers: list[str] = [
             "function",
             "count",
@@ -74,7 +83,7 @@ class Timings:
                 name,
                 str(s["count"]),
                 f"{s['total']:.{decimals}f}",
-                f"{100 * s['total'] / total:.1f}",
+                f"{pct(name=name, s=s)}",
                 *(f"{s[k]:.{decimals}f}" for k in ("mean", "median", "min", "max")),
             ]
             for name, s in sorted(
