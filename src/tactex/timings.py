@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 import torch
-from torch.utils.data import DataLoader, default_collate
+from torch.utils.data import DataLoader, default_collate, get_worker_info
 
 from tactex.settings import get_settings
 
@@ -103,8 +103,8 @@ _ENABLED: bool = get_settings().log_timings
 _CUDA: bool = torch.cuda.is_available()
 
 
-def _sync():
-    if _CUDA:
+def _sync() -> None:
+    if _CUDA and get_worker_info() is None:
         torch.cuda.synchronize()
 
 
