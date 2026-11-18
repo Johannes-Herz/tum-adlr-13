@@ -22,17 +22,20 @@ class TactileCollate:
             batch = [b[0] for b in batch]
         batch: OccupancyGrid2D = np.stack(batch, axis=0)
         B, _, _ = batch.shape
+        num_rays: np.ndarray = self.rng.integers(low=1, high=self.max_rays, size=(B, 1))
+        max_rays_for_batch: int = int(np.max(num_rays))
         rays: Ray2D = sample(
-            resolution=self.resolution, b=B, n=self.max_rays, rng=self.rng
+            resolution=self.resolution,
+            b=B,
+            n=max_rays_for_batch,  # Sample no. of rays per grid before and limit ray generation here to minimize memory
+            rng=self.rng,
         )
         traversals: Traversal2D = traverse(rays=rays, resolution=self.resolution)
-        _, N, _, _ = traversals.shape
-        num_rays: np.ndarray = self.rng.integers(low=1, high=N, size=(B, 1))
         traversal_grids: TraversalGrid2D = cast(
             occupancy_grids=batch, traversals=traversals, num_rays=num_rays
         )
-        x = torch.from_numpy(traversal_grids).float()  # (B, 3, H, W)
-        y = torch.from_numpy(batch[:, None]).float()  # (B, 1, H, W)
+        x = torch.from_numpy(traversal_grids).bool()  # (B, 3, H, W)
+        y = torch.from_numpy(batch[:, None]).bool()  # (B, 1, H, W)
         return x, y
 
 
