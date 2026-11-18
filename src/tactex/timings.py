@@ -16,10 +16,10 @@ type Unit = Literal["ms", "s"]
 class Timings:
     data: dict[str, list[float]] = field(default_factory=dict)
 
-    def add(self, fn_name: str, elapsed_in_ns: int) -> None:
+    def add(self, fn_name: str, elapsed_ns: int) -> None:
         if fn_name not in self.data:
             self.data[fn_name] = []
-        self.data[fn_name].append(elapsed_in_ns)
+        self.data[fn_name].append(elapsed_ns)
 
     @property
     def mean(self) -> dict[str, float]:
@@ -121,7 +121,7 @@ def timed():
                 _sync()
                 TIMINGS.add(
                     fn_name=fn_name,
-                    elapsed_in_ns=(time.perf_counter_ns() - start_time_ns),
+                    elapsed_ns=(time.perf_counter_ns() - start_time_ns),
                 )
 
         return wrapper
