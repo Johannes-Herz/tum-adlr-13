@@ -1,7 +1,7 @@
 import functools
 import statistics
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -127,3 +127,18 @@ def timed():
         return wrapper
 
     return decorator
+
+
+def timed_iter(iterable: Iterable, name: str) -> Iterable:
+    it = iter(iterable)
+    while True:
+        if not _ENABLED:
+            yield from it
+            return
+        start = time.perf_counter_ns()
+        try:
+            item = next(it)
+        except StopIteration:
+            return
+        TIMINGS.add(fn_name=name, elapsed_ns=time.perf_counter_ns() - start)
+        yield item
