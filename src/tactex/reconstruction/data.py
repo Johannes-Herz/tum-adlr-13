@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from tactex.sensing.raycasting import cast, sample, traverse
+from tactex.timings import timed
 from tactex.typing import OccupancyGrid2D, Ray2D, Traversal2D, TraversalGrid2D
 
 
@@ -15,6 +16,7 @@ class TactileCollate:
         self.seed: int = seed
         self.rng: np.random.Generator = np.random.default_rng(seed=seed)
 
+    @timed()
     def __call__(self, batch):
         if isinstance(batch[0], (tuple, list)):
             batch = [b[0] for b in batch]
@@ -50,6 +52,6 @@ def build_dataloader(
         collate_fn=TactileCollate(resolution=resolution, max_rays=max_rays, seed=seed),
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=True,
-        prefetch_factor=2,
+        persistent_workers=True if num_workers > 0 else None,
+        prefetch_factor=2 if num_workers > 0 else None,
     )

@@ -1,8 +1,10 @@
 import numpy as np
 
+from tactex.timings import timed
 from tactex.typing import OccupancyGrid2D, Ray2D, Traversal2D, TraversalGrid2D
 
 
+@timed()
 def sample(resolution: int, b: int, n: int, rng: np.random.Generator) -> Ray2D:
     """Sample random 2D rays between points on the grid's circumcircle.
 
@@ -48,6 +50,7 @@ def sample(resolution: int, b: int, n: int, rng: np.random.Generator) -> Ray2D:
     return rays
 
 
+@timed()
 def traverse(rays: Ray2D, resolution: int) -> Traversal2D:
     """Rasterize continuous 2D rays into ordered integer grid cell indices.
 
@@ -99,6 +102,7 @@ def traverse(rays: Ray2D, resolution: int) -> Traversal2D:
     return points
 
 
+@timed()
 def cast(
     occupancy_grids: OccupancyGrid2D, traversals: Traversal2D, num_rays: np.ndarray
 ) -> TraversalGrid2D:

@@ -3,7 +3,10 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchmetrics import Metric, MetricCollection, MetricTracker
 
+from tactex.timings import timed
 
+
+@timed()
 @torch.no_grad()
 def evaluate(
     model: nn.Module,
