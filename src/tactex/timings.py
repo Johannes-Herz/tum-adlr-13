@@ -129,16 +129,21 @@ def timed():
     return decorator
 
 
-def timed_iter(iterable: Iterable, name: str) -> Iterable:
-    it = iter(iterable)
-    while True:
-        if not _ENABLED:
-            yield from it
-            return
-        start = time.perf_counter_ns()
-        try:
-            item = next(it)
-        except StopIteration:
-            return
-        TIMINGS.add(fn_name=name, elapsed_ns=time.perf_counter_ns() - start)
-        yield item
+class TimedIterable:
+    def __init__(self, iterable: Iterable, name: str):
+        self.iterable = iterable
+        self.name: str = name
+
+    def __len__(self) -> int:
+        return len(self.iterable)
+
+    def __iter__(self):
+        it = iter(self.iterable)
+        while True:
+            start = time.perf_counter_ns()
+            try:
+                item = next(it)
+            except StopIteration:
+                return
+            TIMINGS.add(fn_name=self.name, elapsed_ns=time.perf_counter_ns() - start)
+            yield item
