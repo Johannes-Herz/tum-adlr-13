@@ -1,11 +1,12 @@
 import functools
 import statistics
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
 import torch
+from torch.utils.data import DataLoader, default_collate
 
 from tactex.settings import get_settings
 
@@ -27,6 +28,15 @@ class Timings:
             fn_name: sum(timings) / len(timings)
             for fn_name, timings in self.data.items()
         }
+
+    def drain(self) -> dict[str, list[int]]:
+        out = {k: v[:] for k, v in self.data.items()}
+        self.data.clear()
+        return out
+
+    def merge(self, other: dict[str, list[int]]) -> None:
+        for k, v in other.items():
+            self.data.setdefault(k, []).extend(v)
 
     def stats(self, unit: Unit) -> dict[str, dict[str, int | float]]:
         factor: float = 1_000_000 if unit == "ms" else 1_000_000_000
@@ -51,12 +61,12 @@ class Timings:
         headers: list[str] = [
             "function",
             "count",
-            f"total {unit}",
+            f"total [{unit}]",
             "%",
-            f"mean {unit}",
-            f"median {unit}",
-            f"min {unit}",
-            f"max {unit}",
+            f"mean [{unit}]",
+            f"median [{unit}]",
+            f"min [{unit}]",
+            f"max [{unit}]",
         ]
 
         rows: list[str] = [
@@ -88,7 +98,7 @@ class Timings:
         return self._to_table(unit="ms")
 
 
-TIMINGS: Timings = Timings()
+_TIMINGS: Timings = Timings()
 _ENABLED: bool = get_settings().log_timings
 _CUDA: bool = torch.cuda.is_available()
 
@@ -96,6 +106,19 @@ _CUDA: bool = torch.cuda.is_available()
 def _sync():
     if _CUDA:
         torch.cuda.synchronize()
+
+
+def set_enabled(enabled: bool):
+    global _ENABLED
+    _ENABLED = enabled
+
+
+def is_enabled():
+    return _ENABLED
+
+
+def get_timings() -> Timings:
+    return _TIMINGS
 
 
 def _name_of_fn(fn: Callable) -> str:
@@ -119,7 +142,7 @@ def timed():
                 return fn(*args, **kwargs)
             finally:
                 _sync()
-                TIMINGS.add(
+                _TIMINGS.add(
                     fn_name=fn_name,
                     elapsed_ns=(time.perf_counter_ns() - start_time_ns),
                 )
@@ -129,21 +152,35 @@ def timed():
     return decorator
 
 
-class TimedIterable:
-    def __init__(self, iterable: Iterable, name: str):
-        self.iterable = iterable
-        self.name: str = name
+class TimedCollate:
+    def __init__(self, collate_fn, use_workers: bool):
+        self.collate_fn = collate_fn
+        self.use_workers: bool = use_workers
 
-    def __len__(self) -> int:
-        return len(self.iterable)
+    def __call__(self, batch):
+        out = self.collate_fn(batch)
+        return (*out, _TIMINGS.drain() if self.use_workers else {})
+
+
+class TimedDataLoader(DataLoader):
+    def __init__(self, *args, name="dataloader", collate_fn, **kwargs):
+        super().__init__(
+            *args,
+            collate_fn=TimedCollate(
+                collate_fn or default_collate, kwargs.get("num_workers", 0) > 0
+            ),
+            **kwargs,
+        )
+        self.name: str = f"{name}.wait"
 
     def __iter__(self):
-        it = iter(self.iterable)
+        it = super().__iter__()
         while True:
             start = time.perf_counter_ns()
             try:
-                item = next(it)
+                *batch, worker_timings = next(it)
             except StopIteration:
                 return
-            TIMINGS.add(fn_name=self.name, elapsed_ns=time.perf_counter_ns() - start)
-            yield item
+            _TIMINGS.add(self.name, time.perf_counter_ns() - start)
+            _TIMINGS.merge(worker_timings)
+            yield tuple(batch)
