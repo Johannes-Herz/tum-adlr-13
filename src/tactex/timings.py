@@ -3,20 +3,24 @@ import statistics
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 
 import torch
 
 from tactex.settings import get_settings
 
 
+type Unit = Literal["ms", "s"]
+
+
 @dataclass()
 class Timings:
     data: dict[str, list[float]] = field(default_factory=dict)
 
-    def add(self, fn_name: str, elapsed_in_ms: float) -> None:
+    def add(self, fn_name: str, elapsed_in_ns: float) -> None:
         if fn_name not in self.data:
             self.data[fn_name] = []
-        self.data[fn_name].append(elapsed_in_ms)
+        self.data[fn_name].append(elapsed_in_ns)
 
     @property
     def mean(self) -> dict[str, float]:
@@ -25,15 +29,16 @@ class Timings:
             for fn_name, timings in self.data.items()
         }
 
-    def stats(self) -> dict[str, dict[str, int | float]]:
+    def stats(self, unit: Unit) -> dict[str, dict[str, int | float]]:
+        factor: float = 1_000 if unit == "ms" else 1_000_000
         return {
             fn_name: {
-                "count": len(timings),
-                "total": sum(timings),
-                "mean": statistics.mean(timings),
-                "median": statistics.median(timings),
-                "min": min(timings),
-                "max": max(timings),
+                "count": len(timings) / factor,
+                "total": sum(timings) / factor,
+                "mean": statistics.mean(timings) / factor,
+                "median": statistics.median(timings) / factor,
+                "min": min(timings) / factor,
+                "max": max(timings) / factor,
             }
             for fn_name, timings in self.data.items()
         }
@@ -41,18 +46,18 @@ class Timings:
     def reset(self) -> None:
         self.data.clear()
 
-    def _to_table(self, decimals: int = 4) -> str:
-        stats: dict[str, dict[str, float]] = self.stats()
+    def _to_table(self, unit: Unit, decimals: int = 4) -> str:
+        stats: dict[str, dict[str, float]] = self.stats(unit=unit)
         total: float = sum(fn_stats["total"] for fn_stats in stats.values())
         headers: list[str] = [
             "function",
             "count",
-            "total [ms]",
+            f"total {unit}",
             "%",
-            "mean [ms]",
-            "median [ms]",
-            "min [ms]",
-            "max [ms]",
+            f"mean {unit}",
+            f"median {unit}",
+            f"min {unit}",
+            f"max {unit}",
         ]
 
         rows: list[str] = [
@@ -110,14 +115,14 @@ def timed():
                 return fn(*args, **kwargs)
 
             _sync()
-            start_time: int = time.perf_counter()
+            start_time_ns: int = time.perf_counter_ns()
             try:
                 return fn(*args, **kwargs)
             finally:
                 _sync()
                 TIMINGS.add(
                     fn_name=fn_name,
-                    elapsed_in_ms=(time.perf_counter() - start_time) * 1_000,
+                    elapsed_in_ms=(time.perf_counter_ns() - start_time_ns),
                 )
 
         return wrapper
