@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Literal
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -5,6 +8,26 @@ from torch.utils.data import DataLoader, Dataset
 from tactex.sensing.raycasting import cast, sample, traverse
 from tactex.timings import timed
 from tactex.typing import OccupancyGrid2D, Ray2D, Traversal2D, TraversalGrid2D
+
+
+class OccupancyGridDatset(Dataset):
+    """Loads occupancy grids from disk.
+    Expected layout in `root`:
+        grids.npy   (N, D, H, W)  uint8/bool
+    """
+
+    def __init__(self, root: Path, in_memory: bool = False):
+        self.root: Path = root
+        self.in_memory: bool = in_memory
+        self.mmap_mode: Literal["r"] | None = None if in_memory else "r"
+        self.length: int = np.load(self.root / "grids.npy", mmap_mode="r").shape[0]
+        self.grids = np.load(self.root / "grids.npy", mmap_mode=self.mmap_mode)
+
+    def __getitem__(self, index: int):
+        return np.array(self.grids[index]).astype(np.bool)
+
+    def __len__(self):
+        return self.length
 
 
 class TactileCollate:
@@ -40,7 +63,7 @@ class TactileCollate:
 
 
 def build_dataloader(
-    dataset: Dataset,
+    dataset: OccupancyGridDatset,
     batch_size: int,
     shuffle: bool,
     resolution: int,
