@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     data_root: Path = Path("data")
     hf_token: SecretStr | None = None
+    log_timings: bool = True
 
     @property
     def project_root(self) -> Path:

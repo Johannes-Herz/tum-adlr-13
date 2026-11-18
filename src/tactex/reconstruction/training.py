@@ -8,8 +8,10 @@ from torchmetrics import MetricTracker
 from tqdm.auto import tqdm
 
 from tactex.reconstruction.evaluation import evaluate
+from tactex.timings import timed
 
 
+@timed()
 def train(
     model: nn.Module,
     train_dataloader: DataLoader,
