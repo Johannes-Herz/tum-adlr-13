@@ -22,6 +22,8 @@ class Timings:
         if fn_name not in self.data:
             self.data[fn_name] = []
         self.data[fn_name].append(elapsed_ns)
+        if get_worker_info() is not None:
+            self.worker_keys.add(fn_name)
 
     @property
     def mean(self) -> dict[str, float]:
@@ -31,14 +33,16 @@ class Timings:
         }
 
     def drain(self) -> dict[str, list[int]]:
-        out = {k: v[:] for k, v in self.data.items()}
+        out = ({k: v[:] for k, v in self.data.items()}, set(self.worker_keys))
         self.data.clear()
+        self.worker_keys.clear()
         return out
 
-    def merge(self, other: dict[str, list[int]]) -> None:
-        for k, v in other.items():
+    def merge(self, other) -> None:
+        data, worker_keys = other
+        for k, v in data.items():
             self.data.setdefault(k, []).extend(v)
-            self.worker_keys.add(k)
+        self.worker_keys |= worker_keys
 
     def stats(self, unit: Unit) -> dict[str, dict[str, int | float]]:
         factor: float = 1_000_000 if unit == "ms" else 1_000_000_000
@@ -130,6 +134,10 @@ def get_timings() -> Timings:
     return _TIMINGS
 
 
+def _reset_worker_timings(worker_id: int) -> None:
+    _TIMINGS.reset()
+
+
 def _name_of_fn(fn: Callable) -> str:
     qualname: str = getattr(fn, "__qualname__", None) or type(fn).__qualname__
     module: str = getattr(fn, "__module__", None) or type(fn).__module__
@@ -178,6 +186,7 @@ class TimedDataLoader(DataLoader):
             collate_fn=TimedCollate(
                 collate_fn or default_collate, kwargs.get("num_workers", 0) > 0
             ),
+            worker_init_fn=_reset_worker_timings,
             **kwargs,
         )
         self.name: str = f"{name}.wait"
