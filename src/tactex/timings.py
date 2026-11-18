@@ -116,7 +116,8 @@ def timed():
             finally:
                 _sync()
                 TIMINGS.add(
-                    fn_name=fn_name, elapsed_in_ms=time.perf_counter() - start_time
+                    fn_name=fn_name,
+                    elapsed_in_ms=(time.perf_counter() - start_time) * 1_000,
                 )
 
         return wrapper
