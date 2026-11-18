@@ -5,8 +5,9 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+from tactex import timings
 from tactex.sensing.raycasting import cast, sample, traverse
-from tactex.timings import timed
+from tactex.timings import TimedDataLoader, timed
 from tactex.typing import OccupancyGrid2D, Ray2D, Traversal2D, TraversalGrid2D
 
 
@@ -16,12 +17,14 @@ class OccupancyGridDatset(Dataset):
         grids.npy   (N, D, H, W)  uint8/bool
     """
 
-    def __init__(self, root: Path, in_memory: bool = False):
+    def __init__(self, root: Path, in_memory: bool = False, limit: int | None = None):
         self.root: Path = root
         self.in_memory: bool = in_memory
         self.mmap_mode: Literal["r"] | None = None if in_memory else "r"
-        self.length: int = np.load(self.root / "grids.npy", mmap_mode="r").shape[0]
-        self.grids = np.load(self.root / "grids.npy", mmap_mode=self.mmap_mode)
+        grids = np.load(root / "grids.npy", mmap_mode=self.mmap_mode)
+        N = grids.shape[0]
+        self.length: int = N if limit is None else min(limit, N)
+        self.grids = grids[: self.length]
 
     def __getitem__(self, index: int):
         return np.array(self.grids[index]).astype(np.bool)
@@ -68,16 +71,24 @@ def build_dataloader(
     shuffle: bool,
     resolution: int,
     max_rays: int,
+    name: str,
     seed: int | None,
-    num_workers: int | None,
+    num_workers: int = 0,
 ) -> DataLoader:
-    return DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        collate_fn=TactileCollate(resolution=resolution, max_rays=max_rays, seed=seed),
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-        persistent_workers=True if num_workers > 0 else None,
-        prefetch_factor=2 if num_workers > 0 else None,
-    )
+    collate_fn = TactileCollate(resolution=resolution, max_rays=max_rays, seed=seed)
+    common: dict = {
+        "batch_size": batch_size,
+        "shuffle": shuffle,
+        "num_workers": num_workers,
+        "pin_memory": torch.cuda.is_available(),
+        "persistent_workers": num_workers > 0,
+        "prefetch_factor": 4 if num_workers > 0 else None,
+    }
+    if timings.is_enabled():
+        return TimedDataLoader(
+            dataset,
+            name=name,
+            collate_fn=collate_fn,
+            **common,
+        )
+    return DataLoader(dataset, collate_fn=collate_fn, **common)
