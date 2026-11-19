@@ -132,7 +132,7 @@ def save_shapenet(
     res_path = res_dir(base_path=category_path, resolution=config.grid_size)
     output_path = new_versioned_dir(base_path=res_path)
     output_path.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(output_path / "occupancy_grid.npz", masks=masks)
+    np.save(output_path / "occupancy_grid.npy", masks)
 
     generation_params = asdict(config)
     generation_params.pop("data_root", None)
@@ -191,7 +191,7 @@ def save_partial_shapenet(
         category_dir(source="shapenet", category=config["category"], full_grid=True)
         / f"res{resolution:03d}"
         / f"v{config['dataset_version']:03d}"
-        / "occupancy_grid.npz"
+        / "occupancy_grid.npy"
     )
     metadata = {
         **config,
