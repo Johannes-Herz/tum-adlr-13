@@ -38,12 +38,12 @@ def load_grid(
         source="shapenet", category=category, full_grid=True, extracted=False
     )
     res_path = res_dir(base_path=category_path, resolution=resolution)
-    input_path = res_path / f"v{version:03d}" / "occupancy_grid.npz"
+    input_path = res_path / f"v{version:03d}" / "occupancy_grid.npy"
 
     if not input_path.is_file():
         raise ValueError(f"File not found: {input_path}")
     else:
         print(input_path)
 
-    with np.load(input_path) as data:
-        return data["masks"]
+    grids = np.load(input_path)
+    return grids
