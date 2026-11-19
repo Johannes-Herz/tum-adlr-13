@@ -21,16 +21,27 @@ class OccupancyGridDatset(Dataset):
         self.root: Path = root
         self.in_memory: bool = in_memory
         self.mmap_mode: Literal["r"] | None = None if in_memory else "r"
-        grids = np.load(root / "grids.npy", mmap_mode=self.mmap_mode)
-        N = grids.shape[0]
-        self.length: int = N if limit is None else min(limit, N)
-        self.grids = grids[: self.length]
+        self.grids: np.ndarray | np.memmap = None
+        self.limit: int = limit
+
+    def _lazy_load(self) -> np.ndarray | np.memmap:
+        if self.grids is None:
+            self.grids = np.load(self.root / "grids.npy", mmap_mode=self.mmap_mode)
+        return self.grids
 
     def __getitem__(self, index: int):
+        if self.grids is None:
+            self._lazy_load()
         return np.array(self.grids[index]).astype(np.bool)
 
     def __len__(self):
-        return self.length
+        if self.grids is None:
+            self._lazy_load()
+        return (
+            min(self.limit, self.grids.shape[0])
+            if self.limit is not None
+            else self.grids.shape[0]
+        )
 
 
 class TactileCollate:
