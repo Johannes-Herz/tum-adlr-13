@@ -2,6 +2,7 @@ import warnings
 from pathlib import Path
 
 import numpy as np
+from tqdm import tqdm
 
 from tactex.shapes.ioop import save_shapenet
 from tactex.shapes.mesh.config import DatasetShapenetConfig
@@ -57,7 +58,7 @@ def generate_grid_dataset(config: DatasetShapenetConfig) -> Path:
     rng = np.random.default_rng(config.seed)
 
     masks = []
-    for object_dir in object_dirs:
+    for object_dir in tqdm(object_dirs, desc="Generating occupancy grids", unit="object"):
         obj_path = object_dir / "models" / "model_normalized.obj"
         mesh = load_shape_from_obj(obj_path)
         for _ in range(config.samples_per_object):
