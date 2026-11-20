@@ -21,7 +21,9 @@ class OccupancyGridDatset(Dataset):
         self.root: Path = root
         self.in_memory: bool = in_memory
         self.mmap_mode: Literal["r"] | None = None if in_memory else "r"
-        grids = np.load(root / "grids.npy", mmap_mode=self.mmap_mode)
+        # grids = np.load(root / "grids.npy", mmap_mode=self.mmap_mode)
+        grids = np.load(root / "occupancy_grid.npy", mmap_mode=self.mmap_mode)
+
         N = grids.shape[0]
         self.length: int = N if limit is None else min(limit, N)
         self.grids = grids[: self.length]
