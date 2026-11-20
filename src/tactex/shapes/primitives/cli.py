@@ -59,6 +59,6 @@ if __name__ == "__main__":
     args: Namespace = parser.parse_args()
 
     generation_config: GenerationConfig = (
-        GenerationConfig.from_yaml(args.config) if args.config else GenerationConfig()
+        GenerationConfig.from_file(args.config) if args.config else GenerationConfig()
     )
     main(generation_config=generation_config)
