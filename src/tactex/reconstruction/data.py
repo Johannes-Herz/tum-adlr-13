@@ -17,8 +17,15 @@ class OccupancyGridDatset(Dataset):
         grids.npy   (N, D, H, W)  uint8/bool
     """
 
-    def __init__(self, root: Path, in_memory: bool = False, limit: int | None = None):
+    def __init__(
+        self,
+        root: Path,
+        split: Literal["train", "val", "test"],
+        in_memory: bool = False,
+        limit: int | None = None,
+    ):
         self.root: Path = root
+        self.split: Literal["train", "val", "test"] = split
         self.in_memory: bool = in_memory
         self.mmap_mode: Literal["r"] | None = None if in_memory else "r"
         self.grids: np.ndarray | np.memmap = None
@@ -26,7 +33,9 @@ class OccupancyGridDatset(Dataset):
 
     def _lazy_load(self) -> np.ndarray | np.memmap:
         if self.grids is None:
-            self.grids = np.load(self.root / "grids.npy", mmap_mode=self.mmap_mode)
+            self.grids = np.load(
+                self.root / f"{self.split}.npy", mmap_mode=self.mmap_mode
+            )
         return self.grids
 
     def __getitem__(self, index: int):
