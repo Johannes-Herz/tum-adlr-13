@@ -17,21 +17,40 @@ class OccupancyGridDatset(Dataset):
         grids.npy   (N, D, H, W)  uint8/bool
     """
 
-    def __init__(self, root: Path, in_memory: bool = False, limit: int | None = None):
+    def __init__(
+        self,
+        root: Path,
+        split: Literal["train", "val", "test"],
+        in_memory: bool = False,
+        limit: int | None = None,
+    ):
         self.root: Path = root
+        self.split: Literal["train", "val", "test"] = split
         self.in_memory: bool = in_memory
         self.mmap_mode: Literal["r"] | None = None if in_memory else "r"
-        grids = np.load(root / "grids.npy", mmap_mode=self.mmap_mode)
+        self.grids: np.ndarray | np.memmap = None
+        self.limit: int = limit
 
-        N = grids.shape[0]
-        self.length: int = N if limit is None else min(limit, N)
-        self.grids = grids[: self.length]
+    def _lazy_load(self) -> np.ndarray | np.memmap:
+        if self.grids is None:
+            self.grids = np.load(
+                self.root / f"{self.split}.npy", mmap_mode=self.mmap_mode
+            )
+        return self.grids
 
     def __getitem__(self, index: int):
+        if self.grids is None:
+            self._lazy_load()
         return np.array(self.grids[index]).astype(np.bool)
 
     def __len__(self):
-        return self.length
+        if self.grids is None:
+            self._lazy_load()
+        return (
+            min(self.limit, self.grids.shape[0])
+            if self.limit is not None
+            else self.grids.shape[0]
+        )
 
 
 class TactileCollate:
