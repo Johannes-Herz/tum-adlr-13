@@ -7,7 +7,9 @@ import yaml
 from wandb.sdk.lib.runid import generate_id
 
 import wandb
-from tactex.paths import category_dir, res_dir, versioned_dir, new_versioned_dir
+from tactex.paths import category_dir, res_dir, versioned_dir
+from tactex.reconstruction.data import OccupancyGridDatset
+from tactex.reconstruction.split import split_indices
 from tactex.settings import get_settings
 
 
@@ -32,7 +34,10 @@ def input_dataset(data_config: dict) -> tuple[Path, dict]:
 
     return dataset_path, metadata
 
-def model_output_dir(config: dict, models_root: Path, run_name: str, run_id: str) -> Path:
+
+def model_output_dir(
+    config: dict, models_root: Path, run_name: str, run_id: str
+) -> Path:
     """
     Save trained models in a file structure analogues to the input dataset
     """
@@ -44,8 +49,6 @@ def model_output_dir(config: dict, models_root: Path, run_name: str, run_id: str
     output_dir.mkdir(parents=True, exist_ok=True)
 
     return output_dir
-
-
 
 
 def main() -> None:
@@ -71,9 +74,27 @@ def main() -> None:
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "_" + wandb_run_id
 
     data_root = settings.data_root
-    models_root = settings.models_root‚
+    models_root = settings.models_root
     dataset_path, metadata = input_dataset(config["dataset"])
-    output_dir = model_output_dir(config=config, models_root=models_root, run_name=config["run_name"], run_id=run_id)
+    output_dir = model_output_dir(
+        config=config,
+        models_root=models_root,
+        run_name=config["run_name"],
+        run_id=run_id,
+    )
+
+    dataset = OccupancyGridDatset(
+        dataset_path,
+    )
+
+    splits = split_indices(
+        grid_count=metadata["number_of_samples"],
+        samples_per_object=metadata["samples_per_object"],
+        num_objects=metadata["num_objects"],
+        val_fraction=config["val_fraction"],
+        test_fraction=config["test_fraction"],
+        seed=42,
+    )
 
 
 if __name__ == "__main__":
