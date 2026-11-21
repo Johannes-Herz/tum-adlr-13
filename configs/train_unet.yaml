@@ -1,0 +1,28 @@
+dataset:
+  source: shapenet
+  category: "03797390"
+  resolution: 64
+  version: v001
+
+
+
+
+epochs: 250  # Total target, also when resuming
+batch_size: 64
+learning_rate: 0.001
+widths: [32, 64, 128, 256]
+kernel_size: 3
+max_rays: 40  # Inclusive; partial observations are generated online
+seed: 42
+device: auto  # CUDA if available, otherwise CPU; use cuda to require a GPU
+
+# Keep all projections of one object in the same partition. Requires the
+# generator's metadata.json with samples_per_object and its original grid order.
+split_by: object
+val_fraction: 0.15
+test_fraction: 0.15  # Remaining 70% train; set 0 for no test set
+
+# Optional. Authenticate with `uv run wandb login` or WANDB_API_KEY on the VM.
+wandb: true
+wandb_entity: tum-adlr-13
+wandb_project: reconstruction

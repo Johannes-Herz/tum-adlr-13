@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     Attributes:
         data_root: Root directory for all datasets and processed data. Either an absolute path, or a path relative to the project root. Defaults to `<project_root>/data`.
+        models_root: Root directory for trained models. Relative paths use the
+            project root. Defaults to `<project_root>/models`.
     """
 
     model_config = SettingsConfigDict(
@@ -22,8 +24,10 @@ class Settings(BaseSettings):
     )
 
     data_root: Path = Path("data")
+    models_root: Path = Path("models")
     hf_token: SecretStr | None = None
     log_timings: bool = True
+    wandb_key: SecretStr | None = None
 
     @property
     def project_root(self) -> Path:
@@ -36,6 +40,8 @@ class Settings(BaseSettings):
             raise ValueError(f"Project root has no pyproject.toml: {self.project_root}")
         if not self.data_root.is_absolute():
             self.data_root = self.project_root / self.data_root
+        if not self.models_root.is_absolute():
+            self.models_root = self.project_root / self.models_root
         return self
 
 
