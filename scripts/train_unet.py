@@ -1,15 +1,22 @@
 import argparse
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+import torch
 import yaml
+from torch import nn, optim
+from torchmetrics import MetricCollection
 from wandb.sdk.lib.runid import generate_id
 
 import wandb
 from tactex.paths import category_dir, res_dir, versioned_dir
-from tactex.reconstruction.data import OccupancyGridDatset
-from tactex.reconstruction.split import split_indices
+from tactex.reconstruction.data import OccupancyGridDatset, build_dataloader
+from tactex.reconstruction.metrics import build_metrics, build_trackers
+from tactex.reconstruction.split import save_split_indices, split_indices
+from tactex.reconstruction.training import train
+from tactex.reconstruction.unet import UNet
 from tactex.settings import get_settings
 
 
@@ -56,7 +63,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "config" / "train_unet.yaml",
+        default=Path(__file__).resolve().parents[1] / "configs" / "train_unet.yaml",
     )
     args = parser.parse_args()
 
@@ -77,15 +84,20 @@ def main() -> None:
     models_root = settings.models_root
     dataset_path, metadata = input_dataset(config["dataset"])
     output_dir = model_output_dir(
-        config=config,
+        config=config["dataset"],
         models_root=models_root,
         run_name=config["run_name"],
         run_id=run_id,
     )
+    checkpoint_dir = output_dir / "checkpoints_" + f"{run_id}"
+    checkpoint_dir.mkdir(parents=True, exists_ok=True)
 
-    dataset = OccupancyGridDatset(
-        dataset_path,
-    )
+    device_name = config["device"]
+    if device_name == "auto":
+        device_name = "cuda" if torch.cuda.is_available() else "cpu"
+    if device_name == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA unavailable.")
+    device = torch.device(device_name)
 
     splits = split_indices(
         grid_count=metadata["number_of_samples"],
@@ -93,8 +105,96 @@ def main() -> None:
         num_objects=metadata["num_objects"],
         val_fraction=config["val_fraction"],
         test_fraction=config["test_fraction"],
-        seed=42,
+        seed=config["seed"],
     )
+    save_split_indices(output_dir, splits)
+
+    train_dataset = OccupancyGridDatset(
+        root=dataset_path.parent,
+        split="train",
+        in_memory=False,
+        limit=None,
+        filename="occupancy_grid",
+        indices=splits["train"],
+    )
+    val_dataset = OccupancyGridDatset(
+        root=dataset_path.parent,
+        split="val",
+        in_memory=False,
+        limit=None,
+        filename="occupancy_grid",
+        indices=splits["val"],
+    )
+
+    ray_count_upper_bound = config["max_rays"] + 1
+    train_dataloader = build_dataloader(
+        dataset=train_dataset,
+        batch_size=config["batch_size"],
+        shuffle=True,
+        resolution=config["dataset"]["resolution"],
+        max_rays=ray_count_upper_bound,
+        name="train",
+        seed=config["seed"],
+        num_workers=config["num_workers"],
+    )
+
+    val_dataloader = build_dataloader(
+        dataset=val_dataset,
+        batch_size=config["batch_size"],
+        shuffle=False,
+        resolution=config["dataset"]["resolution"],
+        max_rays=ray_count_upper_bound,
+        name="validation",
+        seed=config["seed"],
+        num_workers=config["num_workers"],
+    )
+
+    unet: UNet = UNet(
+        in_channels=3,
+        out_channels=1,
+        widths=config["widths"],
+        kernel_size=config["kernel_size"],
+    ).to(device)
+
+    loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = (
+        nn.BCEWithLogitsLoss()
+    )
+    optimizer: optim.Adam = optim.Adam(
+        params=unet.parameters(), lr=config["learning_rate"]
+    )
+    metrics: MetricCollection = build_metrics(loss_fn=loss_fn, threshold=0.5)
+    train_tracker, val_tracker = build_trackers(metrics=metrics, device=device)
+    learning_rate_scheduler: optim.lr_scheduler.ReduceLROnPlateau = (
+        optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer=optimizer, mode="min", factor=0.5, patience=4, min_lr=1e-6
+        )
+    )
+
+    epochs = config["epochs"]
+
+    with wandb.init(
+        entity=config["wandb_entity"],
+        project=config["wandb_project"],
+        name=config["run_name"],
+        id=wandb_run_id,
+        resume="allow",
+        config=config,
+        dir=str(output_dir),
+    ) as run:
+        wandb_callback = lambda results, _: run.log(results)
+        train(
+            model=unet,
+            train_dataloader=train_dataloader,
+            val_dataloader=val_dataloader,
+            loss_fn=loss_fn,
+            optimizer=optimizer,
+            train_tracker=train_tracker,
+            val_tracker=val_tracker,
+            epochs=config["epochs"],
+            device=device,
+            callback=wandb_callback,
+        )
+        torch.save(unet.state_dict(), output_dir / "model.pt")
 
 
 if __name__ == "__main__":
