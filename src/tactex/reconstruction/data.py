@@ -15,6 +15,9 @@ class OccupancyGridDatset(Dataset):
     """Loads occupancy grids from disk.
     Expected layout in `root`:
         grids.npy   (N, D, H, W)  uint8/bool
+
+    When using filename, since entire dataset is in one file, e.g. occupancy_grids.npy, be careful usinf "in_memory=True",
+    as it each split will load the enitre dataset into memory.
     """
 
     def __init__(
@@ -23,6 +26,8 @@ class OccupancyGridDatset(Dataset):
         split: Literal["train", "val", "test"],
         in_memory: bool = False,
         limit: int | None = None,
+        filename: str | None = None,
+        indices: np.ndarray | None = None,
     ):
         self.root: Path = root
         self.split: Literal["train", "val", "test"] = split
@@ -31,26 +36,35 @@ class OccupancyGridDatset(Dataset):
         self.grids: np.ndarray | np.memmap = None
         self.limit: int = limit
 
+        self.filenmae = f"{filename}.npy" if filename else f"{self.split}.npy"
+        self.indices = (
+            np.asarray(indices, dtype=np.int64) if indices is not None else None
+        )
+
     def _lazy_load(self) -> np.ndarray | np.memmap:
         if self.grids is None:
-            self.grids = np.load(
-                self.root / f"{self.split}.npy", mmap_mode=self.mmap_mode
-            )
+            self.grids = np.load(self.root / self.filenmae, mmap_mode=self.mmap_mode)
         return self.grids
 
     def __getitem__(self, index: int):
         if self.grids is None:
             self._lazy_load()
+
+        if self.indices is not None:
+            index = self.indices[index]
+
         return np.array(self.grids[index]).astype(np.bool)
 
     def __len__(self):
         if self.grids is None:
             self._lazy_load()
-        return (
-            min(self.limit, self.grids.shape[0])
-            if self.limit is not None
-            else self.grids.shape[0]
-        )
+
+        if self.indices is not None:
+            length = len(self.indices)
+        else:
+            length = self.grids.shape[0]
+
+        return min(self.limit, length) if self.limit is not None else length
 
 
 class TactileCollate:
