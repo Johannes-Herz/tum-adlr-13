@@ -3,8 +3,6 @@ import itertools
 import torch
 from torch import nn
 
-from tactex.timings import timed
-
 
 class ConvBlock(nn.Module):
     """Two 3x3-style convolutions, each followed by BatchNorm and ReLU.
@@ -214,7 +212,6 @@ class UNet(nn.Module):
             kernel_size=1,
         )
 
-    @timed()
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Map ``(B, in_channels, H, W)`` to logits ``(B, out_channels, H, W)``."""
         x = self.stem(x)
