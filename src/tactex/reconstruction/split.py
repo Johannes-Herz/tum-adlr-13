@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 
 
@@ -11,6 +13,9 @@ def split_indices(
 ) -> dict[str, np.ndarray]:
     """
     Splits datset in test, validation, and train according to their objects.
+
+    Returns a dict with train, val, and test and each entry has a 1D array containing the indices of the grids,
+    which will be in the split.
     """
     if samples_per_object < 1 or grid_count % samples_per_object != 0:
         raise ValueError("Grid count must be devisible by samples per object.")
@@ -44,3 +49,8 @@ def split_indices(
     }
 
     return grid_splits
+
+
+def save_split_indices(dir: Path, grid_splits: dict) -> None:
+    dir.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(dir / "split_indices.npz", **grid_splits)
