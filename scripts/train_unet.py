@@ -98,6 +98,7 @@ def main() -> None:
     if device_name == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA unavailable.")
     device = torch.device(device_name)
+    print(f"Run on device: {device}")
 
     splits = split_indices(
         grid_count=metadata["number_of_samples"],
@@ -171,6 +172,7 @@ def main() -> None:
     )
 
     epochs = config["epochs"]
+    print("Start training")
 
     with wandb.init(
         entity=config["wandb_entity"],
@@ -195,6 +197,7 @@ def main() -> None:
             callback=wandb_callback,
         )
         torch.save(unet.state_dict(), output_dir / "model.pt")
+    print(f"Model saved under {output_dir / 'model.pt'}")
 
 
 if __name__ == "__main__":
