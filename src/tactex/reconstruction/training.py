@@ -73,20 +73,24 @@ def train(
             train_dataloader, desc=f"Epoch {epoch}", unit="batch", leave=False
         )
         for x_batch, y_batch in batch_tqdm:
-            x_batch, y_batch = (
-                x_batch.to(device, torch.float32),
-                y_batch.to(device, torch.float32),
-            )
-
-            logit_batch: torch.Tensor = model(x_batch)
-            loss = loss_fn(logit_batch, y_batch)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            train_tracker.update(logit_batch.detach(), y_batch.long())
-            batch_tqdm.set_postfix(loss=f"{loss.item():.4f}")
+            with timed("train.batch"):
+                x_batch, y_batch = (
+                    x_batch.to(device, torch.float32),
+                    y_batch.to(device, torch.float32),
+                )
+                with timed("train.forward"):
+                    logit_batch: torch.Tensor = model(x_batch)
+                with timed("train.loss"):
+                    loss = loss_fn(logit_batch, y_batch)
+                with timed("train.zero_grad"):
+                    optimizer.zero_grad()
+                with timed("train.backward"):
+                    loss.backward()
+                with timed("train.step"):
+                    optimizer.step()
+                with timed("train.metrics"):
+                    train_tracker.update(logit_batch.detach(), y_batch.long())
+                batch_tqdm.set_postfix(loss=f"{loss.item():.4f}")
 
         if lr_scheduler is not None:
             lr_scheduler.step()
