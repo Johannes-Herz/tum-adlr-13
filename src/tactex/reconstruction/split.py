@@ -10,7 +10,7 @@ def split_indices(
     seed: int | None = None,
 ) -> dict[str, np.ndarray]:
     """
-    Splits datset in test, validation, and train according to there objects.
+    Splits datset in test, validation, and train according to their objects.
     """
     if samples_per_object < 1 or grid_count % samples_per_object != 0:
         raise ValueError("Grid count must be devisible by samples per object.")
@@ -23,8 +23,8 @@ def split_indices(
 
     objects = np.random.default_rng(seed).permutation(num_objects)
 
-    n_val = int(len(object) * val_fraction)
-    n_test = int(len(object) * test_fraction)
+    n_val = int(len(objects) * val_fraction)
+    n_test = int(len(objects) * test_fraction)
     n_train = len(objects) - n_val - n_test
 
     if n_val == 0 or (test_fraction > 0 and n_test == 0) or n_train == 0:
