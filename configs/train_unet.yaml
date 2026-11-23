@@ -7,7 +7,7 @@ dataset:
 
 
 
-run_name: training_shapenet
+run_name: unet_037397390
 epochs: 250
 batch_size: 64
 learning_rate: 0.001
