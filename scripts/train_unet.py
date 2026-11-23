@@ -4,6 +4,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import torch
 import yaml
 from torch import nn, optim
@@ -65,6 +66,11 @@ def main() -> None:
         type=Path,
         default=Path(__file__).resolve().parents[1] / "configs" / "train_unet.yaml",
     )
+    parser.add_argument(
+        "--resume", type=Path, help="Pfad zu latest checkpoint (.pt file)."
+    )
+    ### change this so path does not have to be provided, find correct path later on its on,
+    ### based on config and where the model will be saved
     args = parser.parse_args()
 
     with args.config.open(encoding="utf-8") as file:
@@ -74,24 +80,6 @@ def main() -> None:
 
     settings = get_settings()
 
-    wandb.login(key=settings.wandb_key.get_secret_value())
-
-    wandb_run_id = generate_id()
-
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "_" + wandb_run_id
-
-    data_root = settings.data_root
-    models_root = settings.models_root
-    dataset_path, metadata = input_dataset(config["dataset"])
-    output_dir = model_output_dir(
-        config=config["dataset"],
-        models_root=models_root,
-        run_name=config["run_name"],
-        run_id=run_id,
-    )
-    checkpoint_dir = output_dir / "checkpoints_" + f"{run_id}"
-    checkpoint_dir.mkdir(parents=True, exists_ok=True)
-
     device_name = config["device"]
     if device_name == "auto":
         device_name = "cuda" if torch.cuda.is_available() else "cpu"
@@ -100,15 +88,46 @@ def main() -> None:
     device = torch.device(device_name)
     print(f"Run on device: {device}")
 
-    splits = split_indices(
-        grid_count=metadata["number_of_samples"],
-        samples_per_object=metadata["samples_per_object"],
-        num_objects=metadata["num_objects"],
-        val_fraction=config["val_fraction"],
-        test_fraction=config["test_fraction"],
-        seed=config["seed"],
-    )
-    save_split_indices(output_dir, splits)
+    checkpoint = None
+    if args.resume is not None:
+        checkpoint = torch.load(args.resume, map_location=device, weights_only=True)
+
+    wandb.login(key=settings.wandb_key.get_secret_value())
+
+    data_root = settings.data_root
+    models_root = settings.models_root
+    dataset_path, metadata = input_dataset(config["dataset"])
+
+    if checkpoint is None:
+        wandb_run_id = generate_id()
+        run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "_" + wandb_run_id
+        output_dir = model_output_dir(
+            config=config["dataset"],
+            models_root=models_root,
+            run_name=config["run_name"],
+            run_id=run_id,
+        )
+    else:
+        wandb_run_id = checkpoint["wandb_run_id"]
+        run_id = checkpoint["run_id"]
+        output_dir = args.resume.resolve().parents[1]  ### Check correct path again
+
+    checkpoint_dir = output_dir / f"checkpoints_{run_id}"
+    checkpoint_dir.mkdir(parents=True, exists_ok=True)
+
+    if checkpoint is None:
+        splits = split_indices(
+            grid_count=metadata["number_of_samples"],
+            samples_per_object=metadata["samples_per_object"],
+            num_objects=metadata["num_objects"],
+            val_fraction=config["val_fraction"],
+            test_fraction=config["test_fraction"],
+            seed=config["seed"],
+        )
+        save_split_indices(output_dir, splits)
+    else:
+        with np.load(output_dir / "split_indices.npz") as saved_splits:
+            splits = {name: saved_splits[name] for name in ("train", "val", "test")}
 
     train_dataset = OccupancyGridDatset(
         root=dataset_path.parent,
@@ -174,16 +193,47 @@ def main() -> None:
     epochs = config["epochs"]
     print("Start training")
 
+    completed_epochs = 0
+    if checkpoint is not None:
+        unet.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        learning_rate_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        completed_epochs = checkpoint["completed_epochs"]
+
+    remaining_epochs = config["epochs"] - completed_epochs
+
     with wandb.init(
         entity=config["wandb_entity"],
         project=config["wandb_project"],
         name=config["run_name"],
         id=wandb_run_id,
-        resume="allow",
-        config=config,
+        resume="must" if checkpoint is not None else None,
+        config=config if checkpoint is None else None,
         dir=str(output_dir),
     ) as run:
-        wandb_callback = lambda results, _: run.log(results)
+
+        def on_epoch_end(results: dict, epoch: int) -> None:
+            total_epochs = completed_epochs + epoch + 1
+            learning_rate_scheduler.step(results["val/loss"])
+
+            state = {
+                "completed_epochs": total_epochs,
+                "model_state_dict": unet.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": learning_rate_scheduler.state_dict(),
+                "wandb_run_id": wandb_run_id,
+                "run_id": run_id,
+                "config": config,
+            }
+
+            # Save in two steps, in case training is interupted right in the moment of saving the checkpoint
+            last_checkpoint = checkpoint_dir / "last_checkpoint.pt"
+            temporary = last_checkpoint.with_suffix(".tmp")
+            torch.save(state, temporary)
+            temporary.replace(last_checkpoint)
+
+            run.log({"epoch": total_epochs, **results})
+
         train(
             model=unet,
             train_dataloader=train_dataloader,
@@ -192,9 +242,9 @@ def main() -> None:
             optimizer=optimizer,
             train_tracker=train_tracker,
             val_tracker=val_tracker,
-            epochs=config["epochs"],
+            epochs=remaining_epochs,
             device=device,
-            callback=wandb_callback,
+            callback=on_epoch_end,
         )
         torch.save(unet.state_dict(), output_dir / "model.pt")
     print(f"Model saved under {output_dir / 'model.pt'}")
