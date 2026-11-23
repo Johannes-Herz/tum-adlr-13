@@ -122,6 +122,7 @@ class Checkpointer(TrainingCallback):
         torch.save(
             {
                 "epoch": epoch + 1,
+                "model_config": getattr(model, "config", None),
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "lr_scheduler_state_dict": lr_scheduler.state_dict()

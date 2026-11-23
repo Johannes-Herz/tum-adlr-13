@@ -177,6 +177,12 @@ class UNet(nn.Module):
             kernel_size: Kernel size of all ``ConvBlock``s; must be odd.
         """
         super().__init__()
+        self.config: dict = {
+            "in_channels": in_channels,
+            "out_channels": out_channels,
+            "widths": list(widths),
+            "kernel_size": kernel_size,
+        }
 
         self.stem: ConvBlock = ConvBlock(
             in_channels=in_channels,
