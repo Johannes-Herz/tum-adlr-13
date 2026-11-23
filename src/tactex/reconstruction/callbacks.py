@@ -105,14 +105,10 @@ class Checkpointer(TrainingCallback):
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.best_metric: float | None = None
 
-    def _save_wandb_artifact(self, path: Path, epoch: int) -> None:
-        artifact: wandb.Artifact = wandb.Artifact(
-            name=f"checkpoint-{wandb.run.id}",
-            type="model",
-            description=f"Checkpoint saved at epoch {epoch:04d}",
-        )
+    def _save_wandb_artifact(self, path: Path, alias: str) -> None:
+        artifact = wandb.Artifact(name=f"checkpoint-{wandb.run.id}", type="model")
         artifact.add_file(str(path), name=path.name)
-        wandb.run.log_artifact(artifact, aliases=[f"epoch-{epoch:04d}"])
+        wandb.run.log_artifact(artifact, aliases=[alias])
 
     def _save(
         self,
@@ -180,8 +176,8 @@ class Checkpointer(TrainingCallback):
         optimizer: optim.Optimizer,
         lr_scheduler: optim.lr_scheduler.LRScheduler | None,
     ) -> None:
-        if self.log_to_wandb:
-            if (self.save_dir / "latest.pt").exists():
-                self._save_wandb_artifact(self.save_dir / "latest.pt", -1)
+        if self.log_to_wandb and wandb.run is not None:
             if (self.save_dir / "best.pt").exists():
-                self._save_wandb_artifact(self.save_dir / "best.pt", -1)
+                self._save_wandb_artifact(self.save_dir / "best.pt", alias="best")
+            if (self.save_dir / "latest.pt").exists():
+                self._save_wandb_artifact(self.save_dir / "latest.pt", alias="latest")
