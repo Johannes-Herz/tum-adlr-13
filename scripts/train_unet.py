@@ -113,7 +113,7 @@ def main() -> None:
         output_dir = args.resume.resolve().parents[1]  ### Check correct path again
 
     checkpoint_dir = output_dir / f"checkpoints_{run_id}"
-    checkpoint_dir.mkdir(parents=True, exists_ok=True)
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     if checkpoint is None:
         splits = split_indices(
