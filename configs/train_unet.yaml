@@ -27,4 +27,4 @@ test_fraction: 0.15  # Remaining 70% train; set 0 for no test set
 # Optional. Authenticate with `uv run wandb login` or WANDB_API_KEY on the VM.
 wandb: true
 wandb_entity: tum-adlr-13
-wandb_project: reconstruction
+wandb_project: 037397390

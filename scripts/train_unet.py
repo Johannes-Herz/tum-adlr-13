@@ -7,13 +7,15 @@ from pathlib import Path
 import numpy as np
 import torch
 import yaml
-from torch import nn, optim
+from torch import optim
 from torchmetrics import MetricCollection
 from wandb.sdk.lib.runid import generate_id
 
 import wandb
 from tactex.paths import category_dir, res_dir, versioned_dir
+from tactex.reconstruction.callbacks import Checkpointer, WandBRun
 from tactex.reconstruction.data import OccupancyGridDatset, build_dataloader
+from tactex.reconstruction.losses import BCEDiceLoss
 from tactex.reconstruction.metrics import build_metrics, build_trackers
 from tactex.reconstruction.split import save_split_indices, split_indices
 from tactex.reconstruction.training import train
@@ -177,14 +179,15 @@ def main() -> None:
     ).to(device)
 
     loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = (
-        nn.BCEWithLogitsLoss()
-    )
+        BCEDiceLoss()
+    )  # nn.BCEWithLogitsLoss()
+
     optimizer: optim.Adam = optim.Adam(
         params=unet.parameters(), lr=config["learning_rate"]
     )
     metrics: MetricCollection = build_metrics(loss_fn=loss_fn, threshold=0.5)
     train_tracker, val_tracker = build_trackers(metrics=metrics, device=device)
-    learning_rate_scheduler: optim.lr_scheduler.ReduceLROnPlateau = (
+    lr_scheduler: optim.lr_scheduler.ReduceLROnPlateau = (
         optim.lr_scheduler.ReduceLROnPlateau(
             optimizer=optimizer, mode="min", factor=0.5, patience=4, min_lr=1e-6
         )
@@ -197,12 +200,28 @@ def main() -> None:
     if checkpoint is not None:
         unet.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        learning_rate_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        completed_epochs = checkpoint["completed_epochs"]
+        lr_scheduler.load_state_dict(checkpoint["lr_scheduler_state_dict"])
+        completed_epochs = checkpoint["epoch"]
 
     remaining_epochs = config["epochs"] - completed_epochs
 
-    with wandb.init(
+    checkpoint_callback: Checkpointer = Checkpointer(
+        save_dir=checkpoint_dir,
+        every_n_epochs=1,
+        metric="val/iou_occ",
+        mode="max",
+        save_to_wandb=True,
+        run_metadata={
+            "wandb_run_id": wandb_run_id,
+            "run_id": run_id,
+            "config": config,
+        },
+    )
+
+    if checkpoint is not None:
+        checkpoint_callback.best_metric = checkpoint.get("best_metric")
+
+    with WandBRun(
         entity=config["wandb_entity"],
         project=config["wandb_project"],
         name=config["run_name"],
@@ -210,30 +229,8 @@ def main() -> None:
         resume="must" if checkpoint is not None else None,
         config=config if checkpoint is None else None,
         dir=str(output_dir),
-    ) as run:
-
-        def on_epoch_end(results: dict, epoch: int) -> None:
-            total_epochs = completed_epochs + epoch + 1
-            learning_rate_scheduler.step(results["val/loss"])
-
-            state = {
-                "completed_epochs": total_epochs,
-                "model_state_dict": unet.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "scheduler_state_dict": learning_rate_scheduler.state_dict(),
-                "wandb_run_id": wandb_run_id,
-                "run_id": run_id,
-                "config": config,
-            }
-
-            # Save in two steps, in case training is interupted right in the moment of saving the checkpoint
-            last_checkpoint = checkpoint_dir / "last_checkpoint.pt"
-            temporary = last_checkpoint.with_suffix(".tmp")
-            torch.save(state, temporary)
-            temporary.replace(last_checkpoint)
-
-            run.log({"epoch": total_epochs, **results})
-
+    ) as wandb_run:
+        val_batches = list(val_dataloader)
         train(
             model=unet,
             train_dataloader=train_dataloader,
@@ -244,7 +241,9 @@ def main() -> None:
             val_tracker=val_tracker,
             epochs=remaining_epochs,
             device=device,
-            callback=on_epoch_end,
+            lr_scheduler=lr_scheduler,
+            callbacks=[checkpoint_callback, wandb_run],
+            start_epoch=completed_epochs,
         )
         torch.save(unet.state_dict(), output_dir / "model.pt")
     print(f"Model saved under {output_dir / 'model.pt'}")
