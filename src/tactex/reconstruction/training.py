@@ -24,9 +24,8 @@ def train(
     epochs: int,
     device: torch.device,
     lr_scheduler: optim.lr_scheduler.LRScheduler | None = None,
-    callbacks: list[TrainingCallback] | None = None,
-    *,
     start_epoch: int | None = None,
+    callbacks: list[TrainingCallback] | None = None,
 ) -> None:
     """Train a model and track training and validation metrics per epoch.
 
