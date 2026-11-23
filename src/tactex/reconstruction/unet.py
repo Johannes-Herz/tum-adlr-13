@@ -1,4 +1,5 @@
 import itertools
+from typing import Self
 
 import torch
 from torch import nn
@@ -222,3 +223,32 @@ class UNet(nn.Module):
         for up_block in self.up_blocks:
             x = up_block(x, skip=skips.pop())
         return self.head(x)
+
+    @classmethod
+    def from_depth(
+        cls,
+        in_channels: int,
+        out_channels: int,
+        depth: int,
+        width: int,
+        kernel_size: int = 3,
+    ) -> Self:
+        """Create a U-Net with ``depth`` levels and ``width`` channels per level.
+
+        Args:
+            in_channels: Channels of the input.
+            out_channels: Channels of the output (e.g. 1 for binary occupancy).
+            depth: Number of resolution levels (including the bottleneck).
+            width: Channels per level.
+            kernel_size: Kernel size of all ``ConvBlock``s; must be odd.
+
+        Returns:
+            A U-Net instance.
+        """
+        widths: list[int] = [width * 2**i for i in range(depth)]
+        return cls(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            widths=widths,
+            kernel_size=kernel_size,
+        )
