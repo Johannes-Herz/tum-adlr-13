@@ -182,7 +182,7 @@ class TimedCollate:
 
     def __call__(self, batch):
         out = self.collate_fn(batch)
-        return (*out, _TIMINGS.drain() if self.use_workers else {})
+        return (*out, _TIMINGS.drain() if self.use_workers else ({}, set()))
 
 
 class TimedDataLoader(DataLoader):
