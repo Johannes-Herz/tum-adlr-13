@@ -5,7 +5,7 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchmetrics import MetricTracker
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from tactex.reconstruction.callbacks import TrainingCallback
 from tactex.reconstruction.evaluation import evaluate
