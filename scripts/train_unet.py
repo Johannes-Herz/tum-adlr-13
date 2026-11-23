@@ -234,7 +234,7 @@ def main() -> None:
         train(
             model=unet,
             train_dataloader=train_dataloader,
-            val_dataloader=val_dataloader,
+            val_dataloader=val_batches,
             loss_fn=loss_fn,
             optimizer=optimizer,
             train_tracker=train_tracker,
