@@ -2,6 +2,7 @@ import functools
 import statistics
 import time
 from collections.abc import Callable
+from contextlib import ContextDecorator
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -144,29 +145,34 @@ def _name_of_fn(fn: Callable) -> str:
     return f"{module}.{qualname}"
 
 
-def timed():
-    def decorator(fn: Callable):
-        fn_name: str = _name_of_fn(fn=fn)
+class timed(ContextDecorator):
+    def __init__(self, name: str | None = None):
+        self.name: str = name
+
+    def __enter__(self):
+        if not _ENABLED:
+            return
+        _sync()
+        self.start_time_ns: int = time.perf_counter_ns()
+
+    def __exit__(self, *exc):
+        if not _ENABLED:
+            return
+        _sync()
+        _TIMINGS.add(
+            fn_name=self.name,
+            elapsed_ns=(time.perf_counter_ns() - self.start_time_ns),
+        )
+
+    def __call__(self, fn: Callable):
+        fn_name: str = self.name or _name_of_fn(fn)
 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            if not _ENABLED:
+            with timed(fn_name):
                 return fn(*args, **kwargs)
-
-            _sync()
-            start_time_ns: int = time.perf_counter_ns()
-            try:
-                return fn(*args, **kwargs)
-            finally:
-                _sync()
-                _TIMINGS.add(
-                    fn_name=fn_name,
-                    elapsed_ns=(time.perf_counter_ns() - start_time_ns),
-                )
 
         return wrapper
-
-    return decorator
 
 
 class TimedCollate:

@@ -5,8 +5,9 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchmetrics import MetricTracker
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
+from tactex.reconstruction.callbacks import TrainingCallback
 from tactex.reconstruction.evaluation import evaluate
 from tactex.timings import timed
 
@@ -23,7 +24,7 @@ def train(
     epochs: int,
     device: torch.device,
     lr_scheduler: optim.lr_scheduler.LRScheduler | None = None,
-    callback: Callable[[dict[str, Any, int]], None] | None = None,
+    callbacks: list[TrainingCallback] | None = None,
 ) -> None:
     """Train a model and track training and validation metrics per epoch.
 
@@ -46,11 +47,12 @@ def train(
         val_tracker: Tracks metrics on the validation set; one step per epoch.
         epochs: Number of epochs to train in this call.
         device: Device for the model, the trackers, and all batches.
-        lr_scheduler: Optional scheduler, stepped once per epoch.
-        log_fn: Optional callback called once per epoch as
-            ``log_fn(results, epoch)``, where ``results`` maps metric names
-            (e.g. ``"train/loss"``, ``"val/iou_occ"``) to floats. Use it to
-            forward results to a logger such as wandb.
+        lr_scheduler: Optional scheduler, stepped once per epoch after
+            evaluation (``ReduceLROnPlateau`` receives ``val/loss``).
+        callbacks: Optional list of :class:`TrainingCallback` instances whose
+            ``on_epoch_end`` hook is invoked once per epoch with the epoch
+            index, computed metric dictionary, model, optimizer, and
+            lr_scheduler.
 
     Returns:
         None. Results are available through ``train_tracker`` and ``val_tracker``
@@ -61,35 +63,37 @@ def train(
     val_tracker.to(device)
 
     start: int = train_tracker.n_steps
-    epoch_tqdm: tqdm = tqdm(
-        range(start, start + epochs), leave=True, desc="Training", unit="epoch"
-    )
+    epoch_tqdm: tqdm = tqdm(range(start, start + epochs), desc="Training", unit="epoch")
+    batch_tqdm: tqdm = tqdm(total=len(train_dataloader), unit="batch")
+
     for epoch in epoch_tqdm:
         # --- Training ---
         model.train()
         train_tracker.increment()
 
-        batch_tqdm: tqdm = tqdm(
-            train_dataloader, desc=f"Epoch {epoch}", unit="batch", leave=False
-        )
-        for x_batch, y_batch in batch_tqdm:
-            x_batch, y_batch = (
-                x_batch.to(device, torch.float32),
-                y_batch.to(device, torch.float32),
-            )
+        batch_tqdm.reset()
+        batch_tqdm.set_description(f"Epoch {epoch}")
+        for x_batch, y_batch in train_dataloader:
+            with timed("train.batch"):
+                x_batch, y_batch = (
+                    x_batch.to(device, torch.float32),
+                    y_batch.to(device, torch.float32),
+                )
+                with timed("train.forward"):
+                    logit_batch: torch.Tensor = model(x_batch)
+                with timed("train.loss"):
+                    loss = loss_fn(logit_batch, y_batch)
+                with timed("train.zero_grad"):
+                    optimizer.zero_grad()
+                with timed("train.backward"):
+                    loss.backward()
+                with timed("train.step"):
+                    optimizer.step()
+                with timed("train.metrics"):
+                    train_tracker.update(logit_batch.detach(), y_batch.long())
 
-            logit_batch: torch.Tensor = model(x_batch)
-            loss = loss_fn(logit_batch, y_batch)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            train_tracker.update(logit_batch.detach(), y_batch.long())
-            batch_tqdm.set_postfix(loss=f"{loss.item():.4f}")
-
-        if lr_scheduler is not None:
-            lr_scheduler.step()
+                batch_tqdm.set_postfix(loss=f"{loss.item():.4f}")
+                batch_tqdm.update(1)
 
         # --- Evaluation ---
         val_tracker.increment()
@@ -106,5 +110,31 @@ def train(
                 if k in ("train/loss", "val/loss", "val/iou_occ")
             }
         )
-        if callback is not None:
-            callback(results, epoch)
+
+        if lr_scheduler is not None:
+            if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                lr_scheduler.step(results["val/loss"])
+            else:
+                lr_scheduler.step()
+
+        if callbacks is not None:
+            with timed("train.callbacks"):
+                for callback in callbacks:
+                    callback.on_epoch_end(
+                        epoch=epoch,
+                        metrics=results,
+                        model=model,
+                        optimizer=optimizer,
+                        lr_scheduler=lr_scheduler,
+                    )
+
+    batch_tqdm.close()
+
+    if callbacks is not None:
+        with timed("train.callbacks"):
+            for callback in callbacks:
+                callback.on_training_end(
+                    model,
+                    optimizer,
+                    lr_scheduler,
+                )
