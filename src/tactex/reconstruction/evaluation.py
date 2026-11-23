@@ -42,5 +42,7 @@ def evaluate(
             x_batch.to(device, torch.float32),
             y_batch.to(device, torch.float32),
         )
-        logit_batch: torch.Tensor = model(x_batch)
-        metrics.update(logit_batch.detach(), y_batch.long())
+        with timed("evaluate.forward"):
+            logit_batch: torch.Tensor = model(x_batch)
+        with timed("evaluate.metrics"):
+            metrics.update(logit_batch.detach(), y_batch.long())
