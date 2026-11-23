@@ -96,6 +96,7 @@ class Checkpointer(TrainingCallback):
         metric: str,
         mode: str,
         save_to_wandb: bool,
+        run_metadata: dict | None = None,
     ) -> None:
         self.save_dir: Path = save_dir
         self.every_n_epochs: int = every_n_epochs
@@ -104,6 +105,7 @@ class Checkpointer(TrainingCallback):
         self.save_to_wandb: bool = save_to_wandb
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.best_metric: float | None = None
+        self.run_metadata = dict(run_metadata or {})
 
     def _save_wandb_artifact(self, path: Path, alias: str) -> None:
         artifact = wandb.Artifact(name=f"checkpoint-{wandb.run.id}", type="model")
@@ -119,19 +121,22 @@ class Checkpointer(TrainingCallback):
         optimizer: optim.Optimizer,
         lr_scheduler: optim.lr_scheduler.LRScheduler | None,
     ) -> None:
-        torch.save(
-            {
-                "epoch": epoch + 1,
-                "model_config": getattr(model, "config", None),
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "lr_scheduler_state_dict": lr_scheduler.state_dict()
-                if lr_scheduler is not None
-                else None,
-                "metrics": metrics,
-            },
-            path,
-        )
+        state = {
+            **self.run_metadata,
+            "epoch": epoch + 1,
+            "model_config": getattr(model, "config", None),
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "lr_scheduler_state_dict": (
+                lr_scheduler.state_dict() if lr_scheduler is not None else None
+            ),
+            "metrics": metrics,
+            "best_metric": self.best_metric,
+        }
+
+        temporary = path.with_suffix(".tmp")
+        torch.save(state, temporary)
+        temporary.replace(path)
 
     def _is_better(self, new_metric: float, best_metric: float) -> bool:
         if self.mode == "min":
