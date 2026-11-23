@@ -112,12 +112,13 @@ def train(
             }
         )
 
-        if callbacks is not None:
-            for callback in callbacks:
-                callback.on_epoch_end(
-                    epoch=epoch,
-                    metrics=results,
-                    model=model,
-                    optimizer=optimizer,
-                    lr_scheduler=lr_scheduler,
-                )
+        with timed("train.callbacks"):
+            if callbacks is not None:
+                for callback in callbacks:
+                    callback.on_epoch_end(
+                        epoch=epoch,
+                        metrics=results,
+                        model=model,
+                        optimizer=optimizer,
+                        lr_scheduler=lr_scheduler,
+                    )
