@@ -95,13 +95,13 @@ class Checkpointer(TrainingCallback):
         every_n_epochs: int,
         metric: str,
         mode: str,
-        log_to_wandb: bool,
+        save_to_wandb: bool,
     ) -> None:
         self.save_dir: Path = save_dir
         self.every_n_epochs: int = every_n_epochs
         self.metric: str = metric
         self.mode: Literal["min", "max"] = mode
-        self.log_to_wandb: bool = log_to_wandb
+        self.save_to_wandb: bool = save_to_wandb
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.best_metric: float | None = None
 
@@ -177,7 +177,7 @@ class Checkpointer(TrainingCallback):
         optimizer: optim.Optimizer,
         lr_scheduler: optim.lr_scheduler.LRScheduler | None,
     ) -> None:
-        if self.log_to_wandb and wandb.run is not None:
+        if self.save_to_wandb and wandb.run is not None:
             if (self.save_dir / "best.pt").exists():
                 self._save_wandb_artifact(self.save_dir / "best.pt", alias="best")
             if (self.save_dir / "latest.pt").exists():
