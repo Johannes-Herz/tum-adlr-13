@@ -98,7 +98,9 @@ def traverse(rays: Ray2D, resolution: int) -> Traversal2D:
 
     # Merge initial ray_points and bridges
     # points: np.ndarray = np.unique(np.concat([indices, bridges], axis=-2), axis=-2) # we dont need to dedup!!!
-    points: np.ndarray = np.concat([indices, bridges], axis=-2)
+    points = np.empty((*indices.shape[:-2], 2 * num_steps - 1, 2), dtype=indices.dtype)
+    points[..., 0::2, :] = indices
+    points[..., 1::2, :] = bridges
     return points
 
 
