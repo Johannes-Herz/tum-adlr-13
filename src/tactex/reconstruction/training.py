@@ -25,6 +25,8 @@ def train(
     device: torch.device,
     lr_scheduler: optim.lr_scheduler.LRScheduler | None = None,
     callbacks: list[TrainingCallback] | None = None,
+    *,
+    start_epoch: int | None = None,
 ) -> None:
     """Train a model and track training and validation metrics per epoch.
 
@@ -62,7 +64,7 @@ def train(
     train_tracker.to(device)
     val_tracker.to(device)
 
-    start: int = train_tracker.n_steps
+    start: int = train_tracker.n_steps if start_epoch is None else start_epoch
     epoch_tqdm: tqdm = tqdm(range(start, start + epochs), desc="Training", unit="epoch")
     batch_tqdm: tqdm = tqdm(total=len(train_dataloader), unit="batch")
 
