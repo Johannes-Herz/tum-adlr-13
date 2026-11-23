@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from torchmetrics import MetricTracker
 from tqdm.auto import tqdm
 
+from tactex.reconstruction.callbacks import TrainingCallback
 from tactex.reconstruction.evaluation import evaluate
 from tactex.timings import timed
 
@@ -23,7 +24,7 @@ def train(
     epochs: int,
     device: torch.device,
     lr_scheduler: optim.lr_scheduler.LRScheduler | None = None,
-    callback: Callable[[dict[str, Any, int]], None] | None = None,
+    callbacks: list[TrainingCallback] | None = None,
 ) -> None:
     """Train a model and track training and validation metrics per epoch.
 
@@ -110,5 +111,13 @@ def train(
                 if k in ("train/loss", "val/loss", "val/iou_occ")
             }
         )
-        if callback is not None:
-            callback(results, epoch)
+
+        if callbacks is not None:
+            for callback in callbacks:
+                callback.on_epoch_end(
+                    epoch=epoch,
+                    metrics=results,
+                    model=model,
+                    optimizer=optimizer,
+                    lr_scheduler=lr_scheduler,
+                )
