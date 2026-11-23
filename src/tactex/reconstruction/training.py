@@ -93,9 +93,6 @@ def train(
                     train_tracker.update(logit_batch.detach(), y_batch.long())
                 batch_tqdm.set_postfix(loss=f"{loss.item():.4f}")
 
-        if lr_scheduler is not None:
-            lr_scheduler.step()
-
         # --- Evaluation ---
         val_tracker.increment()
         evaluate(model, val_dataloader, val_tracker, device)
@@ -111,6 +108,12 @@ def train(
                 if k in ("train/loss", "val/loss", "val/iou_occ")
             }
         )
+
+        if lr_scheduler is not None:
+            if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                lr_scheduler.step(results["val/loss"])
+            else:
+                lr_scheduler.step()
 
         with timed("train.callbacks"):
             if callbacks is not None:
