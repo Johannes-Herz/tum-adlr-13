@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, Self
 
 import torch
 from torch import nn, optim
@@ -25,18 +25,25 @@ class TrainingCallback(Protocol):
         lr_scheduler: optim.lr_scheduler.LRScheduler | None,
     ) -> None: ...
 
+    def on_training_end(
+        self,
+        model: nn.Module,
+        optimizer: optim.Optimizer,
+        lr_scheduler: optim.lr_scheduler.LRScheduler | None,
+    ) -> None: ...
+
 
 class WandBRun(TrainingCallback):
     """Callback for logging metrics to Weights & Biases."""
 
     def __init__(
         self,
-        entity: str,
-        project: str,
-        id: str | None,
-        name: str,
-        dir: Path,
-        config: dict,
+        entity: str | None = None,
+        project: str | None = None,
+        id: str | None = None,
+        name: str | None = None,
+        dir: Path | None = None,
+        config: dict | None = None,
     ) -> None:
         if os.environ.get("WANDB_API_KEY") is None:
             raise ValueError(
@@ -44,7 +51,7 @@ class WandBRun(TrainingCallback):
             )
         if os.environ.get("WANDB_MODE", "online") == "offline":
             print("Warning: WANDB_MODE=offline, so WandBRun will not log metrics.")
-        self.run: wandb.Run = wandb.init(
+        self.run: wandb.Run = wandb.run or wandb.init(
             entity=entity,
             project=project,
             id=id,
@@ -53,6 +60,12 @@ class WandBRun(TrainingCallback):
             resume="allow",
             config=config,
         )
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.run.finish()
 
     def on_epoch_end(
         self,
@@ -63,6 +76,14 @@ class WandBRun(TrainingCallback):
         lr_scheduler: optim.lr_scheduler.LRScheduler | None,
     ) -> None:
         self.run.log(metrics, step=epoch)
+
+    def on_training_end(
+        self,
+        model: nn.Module,
+        optimizer: optim.Optimizer,
+        lr_scheduler: optim.lr_scheduler.LRScheduler | None,
+    ) -> None:
+        pass
 
 
 class Checkpointer(TrainingCallback):
@@ -84,7 +105,7 @@ class Checkpointer(TrainingCallback):
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.best_metric: float | None = None
 
-    def _save_artifact(self, path: Path, epoch: int) -> None:
+    def _save_wandb_artifact(self, path: Path, epoch: int) -> None:
         artifact: wandb.Artifact = wandb.Artifact(
             name=f"checkpoint-{wandb.run.id}",
             type="model",
@@ -114,12 +135,6 @@ class Checkpointer(TrainingCallback):
             },
             path,
         )
-        if self.log_to_wandb:
-            if wandb.run is None:
-                raise RuntimeError(
-                    "WandBRun is not initialized. Please initialize it before using Checkpointer with log_to_wandb=True."
-                )
-            self._save_artifact(path, epoch)
 
     def _is_better(self, new_metric: float, best_metric: float) -> bool:
         if self.mode == "min":
@@ -158,3 +173,15 @@ class Checkpointer(TrainingCallback):
                     optimizer,
                     lr_scheduler,
                 )
+
+    def on_training_end(
+        self,
+        model: nn.Module,
+        optimizer: optim.Optimizer,
+        lr_scheduler: optim.lr_scheduler.LRScheduler | None,
+    ) -> None:
+        if self.log_to_wandb:
+            if (self.save_dir / "latest.pt").exists():
+                self._save_wandb_artifact(self.save_dir / "latest.pt", -1)
+            if (self.save_dir / "best.pt").exists():
+                self._save_wandb_artifact(self.save_dir / "best.pt", -1)

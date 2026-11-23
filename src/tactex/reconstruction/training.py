@@ -117,8 +117,8 @@ def train(
             else:
                 lr_scheduler.step()
 
-        with timed("train.callbacks"):
-            if callbacks is not None:
+        if callbacks is not None:
+            with timed("train.callbacks"):
                 for callback in callbacks:
                     callback.on_epoch_end(
                         epoch=epoch,
@@ -129,3 +129,12 @@ def train(
                     )
 
     batch_tqdm.close()
+
+    if callbacks is not None:
+        with timed("train.callbacks"):
+            for callback in callbacks:
+                callback.on_training_end(
+                    model,
+                    optimizer,
+                    lr_scheduler,
+                )
