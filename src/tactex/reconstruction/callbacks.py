@@ -44,6 +44,7 @@ class WandBRun(TrainingCallback):
         name: str | None = None,
         dir: Path | None = None,
         config: dict | None = None,
+        resume: Literal["allow", "must", "never"] | None = "allow",
     ) -> None:
         if os.environ.get("WANDB_API_KEY") is None:
             raise ValueError(
@@ -57,7 +58,7 @@ class WandBRun(TrainingCallback):
             id=id,
             name=name,
             dir=dir,
-            resume="allow",
+            resume=resume,
             config=config,
         )
 
