@@ -14,7 +14,7 @@ from wandb.sdk.lib.runid import generate_id
 import wandb
 from tactex.paths import category_dir, res_dir, versioned_dir
 from tactex.reconstruction.callbacks import Checkpointer, WandBRun
-from tactex.reconstruction.data import OccupancyGridDatset, build_dataloader
+from tactex.reconstruction.data import OccupancyGridDataset, build_dataloader
 from tactex.reconstruction.losses import BCEDiceLoss
 from tactex.reconstruction.metrics import build_metrics, build_trackers
 from tactex.reconstruction.split import save_split_indices, split_indices
@@ -131,7 +131,7 @@ def main() -> None:
         with np.load(output_dir / "split_indices.npz") as saved_splits:
             splits = {name: saved_splits[name] for name in ("train", "val", "test")}
 
-    train_dataset = OccupancyGridDatset(
+    train_dataset = OccupancyGridDataset(
         root=dataset_path.parent,
         split="train",
         in_memory=False,
@@ -139,7 +139,7 @@ def main() -> None:
         filename="occupancy_grid",
         indices=splits["train"],
     )
-    val_dataset = OccupancyGridDatset(
+    val_dataset = OccupancyGridDataset(
         root=dataset_path.parent,
         split="val",
         in_memory=False,
