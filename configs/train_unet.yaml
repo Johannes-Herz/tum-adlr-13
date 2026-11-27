@@ -1,6 +1,7 @@
 dataset:
   source: shapenet
-  category: "03797390"
+  # category: "03797390"
+  categories: ["03797390", "04225987"]
   resolution: 64
   version: v001
 

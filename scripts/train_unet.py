@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import yaml
 from torch import optim
+from torch.utils.data import ConcatDataset
 from torchmetrics import MetricCollection
 from wandb.sdk.lib.runid import generate_id
 
@@ -51,7 +52,10 @@ def model_output_dir(
     """
     Save trained models in a file structure analogues to the input dataset
     """
-    output_dir = models_root / config["source"] / config["category"]
+    categories = (
+        config["categories"] if "categories" in config else [config["category"]]
+    )
+    output_dir = models_root / config["source"] / "_".join(categories)
     output_dir = res_dir(output_dir, config["resolution"])
     output_dir = versioned_dir(output_dir, config["version"])
     # output_dir = new_versioned_dir(output_dir / "unet")
@@ -98,7 +102,13 @@ def main() -> None:
 
     data_root = settings.data_root
     models_root = settings.models_root
-    dataset_path, metadata = input_dataset(config["dataset"])
+
+    data_config = config["dataset"]
+    categories = (
+        data_config["categories"]
+        if "categories" in data_config
+        else [data_config["category"]]
+    )
 
     if checkpoint is None:
         wandb_run_id = generate_id()
@@ -117,36 +127,53 @@ def main() -> None:
     checkpoint_dir = output_dir / f"checkpoints_{run_id}"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    if checkpoint is None:
-        splits = split_indices(
-            grid_count=metadata["number_of_samples"],
-            samples_per_object=metadata["samples_per_object"],
-            num_objects=metadata["num_objects"],
-            val_fraction=config["val_fraction"],
-            test_fraction=config["test_fraction"],
-            seed=config["seed"],
-        )
-        save_split_indices(output_dir, splits)
-    else:
-        with np.load(output_dir / "split_indices.npz") as saved_splits:
-            splits = {name: saved_splits[name] for name in ("train", "val", "test")}
+    train_datasets = []
+    val_datasets = []
 
-    train_dataset = OccupancyGridDataset(
-        root=dataset_path.parent,
-        split="train",
-        in_memory=False,
-        limit=None,
-        filename="occupancy_grid",
-        indices=splits["train"],
-    )
-    val_dataset = OccupancyGridDataset(
-        root=dataset_path.parent,
-        split="val",
-        in_memory=False,
-        limit=None,
-        filename="occupancy_grid",
-        indices=splits["val"],
-    )
+    for category in categories:
+        dataset_path, metadata = input_dataset({**data_config, "category": category})
+
+        split_dir = (
+            output_dir if len(categories) == 1 else output_dir / "splits" / category
+        )
+
+        if checkpoint is None:
+            splits = split_indices(
+                grid_count=metadata["number_of_samples"],
+                samples_per_object=metadata["samples_per_object"],
+                num_objects=metadata["num_objects"],
+                val_fraction=config["val_fraction"],
+                test_fraction=config["test_fraction"],
+                seed=config["seed"],
+            )
+            save_split_indices(split_dir, splits)
+        else:
+            with np.load(split_dir / "split_indices.npz") as saved_splits:
+                splits = {name: saved_splits[name] for name in ("train", "val", "test")}
+
+        train_datasets.append(
+            OccupancyGridDataset(
+                root=dataset_path.parent,
+                split="train",
+                in_memory=False,
+                limit=None,
+                filename="occupancy_grid",
+                indices=splits["train"],
+            )
+        )
+        val_datasets.append(
+            OccupancyGridDataset(
+                root=dataset_path.parent,
+                split="val",
+                in_memory=False,
+                limit=None,
+                filename="occupancy_grid",
+                indices=splits["val"],
+            )
+        )
+
+    train_dataset = ConcatDataset(train_datasets)
+    val_dataset = ConcatDataset(val_datasets)
 
     ray_count_upper_bound = config["max_rays"] + 1
     train_dataloader = build_dataloader(
