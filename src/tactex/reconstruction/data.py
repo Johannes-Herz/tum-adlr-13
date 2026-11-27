@@ -12,7 +12,7 @@ from tactex.timings import TimedDataLoader, timed
 from tactex.typing import OccupancyGrid2D, Ray2D, Traversal2D, TraversalGrid2D
 
 
-class OccupancyGridDatset(Dataset):
+class OccupancyGridDataset(Dataset):
     """Loads occupancy grids from disk.
     Expected layout in `root`:
         grids.npy   (N, D, H, W)  uint8/bool
@@ -123,7 +123,7 @@ class OptimizedTactileCollate:
 
 
 def build_dataloader(
-    dataset: OccupancyGridDatset,
+    dataset: OccupancyGridDataset,
     batch_size: int,
     shuffle: bool,
     resolution: int,
