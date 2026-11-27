@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from tactex import timings
 from tactex.sensing.raycasting import cast, sample, traverse
+from tactex.sensing.raycasting_optimized import sample_and_cast_dda
 from tactex.timings import TimedDataLoader, timed
 from tactex.typing import OccupancyGrid2D, Ray2D, Traversal2D, TraversalGrid2D
 
@@ -99,6 +100,28 @@ class TactileCollate:
         return x, y
 
 
+class OptimizedTactileCollate:
+    def __init__(self, resolution: int, max_rays: int, seed: int | None = None):
+        self.resolution: int = resolution
+        self.max_rays: int = max_rays
+        self.seed: int = seed
+        self.rng: np.random.Generator = np.random.default_rng(seed=seed)
+
+    @timed()
+    def __call__(self, batch):
+        if isinstance(batch[0], (tuple, list)):
+            batch = [b[0] for b in batch]
+        batch: OccupancyGrid2D = np.stack(batch, axis=0)
+        B, _, _ = batch.shape
+        num_rays: np.ndarray = self.rng.integers(low=1, high=self.max_rays, size=(B, 1))
+        traversal_grids: TraversalGrid2D = sample_and_cast_dda(
+            occupancy_grids=batch, num_rays=num_rays, rng=self.rng
+        )
+        x = torch.from_numpy(traversal_grids).bool()  # (B, 3, H, W)
+        y = torch.from_numpy(batch[:, None]).bool()  # (B, 1, H, W)
+        return x, y
+
+
 def build_dataloader(
     dataset: OccupancyGridDatset,
     batch_size: int,
@@ -108,8 +131,13 @@ def build_dataloader(
     name: str,
     seed: int | None,
     num_workers: int = 0,
+    optimized: bool = False,
 ) -> DataLoader:
-    collate_fn = TactileCollate(resolution=resolution, max_rays=max_rays, seed=seed)
+    collate_fn = (
+        OptimizedTactileCollate(resolution=resolution, max_rays=max_rays, seed=seed)
+        if optimized
+        else TactileCollate(resolution=resolution, max_rays=max_rays, seed=seed)
+    )
     common: dict = {
         "batch_size": batch_size,
         "shuffle": shuffle,
