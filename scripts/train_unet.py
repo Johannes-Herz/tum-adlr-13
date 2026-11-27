@@ -75,9 +75,12 @@ def main() -> None:
     parser.add_argument(
         "--resume", type=Path, help="Pfad zu latest checkpoint (.pt file)."
     )
+    parser.add_argument("--sweep", action="store_true", help="Enale sweap mode")
     ### change this so path does not have to be provided, find correct path later on its on,
     ### based on config and where the model will be saved
     args = parser.parse_args()
+    if args.sweep and args.resume is not None:
+        parser.error("--sweep and --resume cannot be used together.")
 
     with args.config.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
@@ -197,6 +200,85 @@ def main() -> None:
         seed=config["seed"],
         num_workers=config["num_workers"],
     )
+
+    if args.sweep:
+        val_batches = list(val_dataloader)
+
+        def run_sweep():
+            with WandBRun(resume=None) as wandb_run:
+                trial = wandb_run.run.config
+
+                model = UNet.from_depth(
+                    in_channels=3,
+                    out_channels=1,
+                    depth=trial["depth"],
+                    width=trial["width"],
+                    kernel_size=trial["kernel_size"],
+                ).to(device)
+
+                optimizer = optim.Adam(model.parameters(), lr=trial["learning_rate"])
+                loss_fn = BCEDiceLoss()
+                metrics = build_metrics(loss_fn=loss_fn, threshold=0.5)
+                train_tracker, val_tracker = build_trackers(
+                    metrics=metrics, device=device
+                )
+                scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer, mode="min", factor=0.5, patience=4, min_lr=1e-6
+                )
+                checkpointer = Checkpointer(
+                    save_dir=output_dir / "sweep" / wandb_run.run.id,
+                    every_n_epochs=5,
+                    metric="val/iou_occ",
+                    mode="max",
+                    save_to_wandb=True,
+                )
+
+                train(
+                    model=model,
+                    train_dataloader=train_dataloader,
+                    val_dataloader=val_batches,
+                    loss_fn=loss_fn,
+                    optimizer=optimizer,
+                    train_tracker=train_tracker,
+                    val_tracker=val_tracker,
+                    epochs=20,
+                    device=device,
+                    lr_scheduler=scheduler,
+                    callbacks=[checkpointer, wandb_run],
+                )
+
+        sweep_config: dict = {
+            "name": "unet-mug-skateboard-sweep",
+            "method": "random",
+            "metric": {"name": "val/iou_occ", "goal": "maximize"},
+            "early_terminate": {
+                "type": "hyperband",
+                "min_iter": 5,
+            },
+            "parameters": {
+                "width": {"values": [16, 32, 64]},
+                "depth": {"values": [2, 3, 4, 5]},
+                "kernel_size": {"values": [3, 5]},
+                "learning_rate": {
+                    "distribution": "log_uniform_values",
+                    "min": 1e-5,
+                    "max": 1e-2,
+                },
+            },
+        }
+
+        entity = config["wandb_entity"]
+        project = config["wandb_project"]
+        sweep_id = wandb.sweep(sweep_config, entity=entity, project=project)
+        wandb.agent(
+            sweep_id,
+            function=run_sweep,
+            count=20,
+            entity=entity,
+            project=project,
+        )
+
+        return
 
     unet: UNet = UNet(
         in_channels=3,
