@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Self
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 type Loader = Callable[[str], Any]
 type Dumper = Callable[[dict[str, Any]], str]
@@ -23,6 +23,8 @@ _DUMPERS: dict[str, Dumper] = {
 
 
 class FileConfig(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     @classmethod
     def from_file(cls, path: Path) -> Self:
         """Load a configuration from a file."""
