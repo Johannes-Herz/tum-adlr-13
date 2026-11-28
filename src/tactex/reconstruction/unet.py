@@ -236,7 +236,8 @@ class UNet(nn.Module):
         in_channels: int,
         out_channels: int,
         depth: int,
-        width: int,
+        base_width: int,
+        max_width: int | None = None,
         kernel_size: int = 3,
     ) -> Self:
         """Create a U-Net with ``depth`` levels and ``width`` channels per level.
@@ -245,13 +246,17 @@ class UNet(nn.Module):
             in_channels: Channels of the input.
             out_channels: Channels of the output (e.g. 1 for binary occupancy).
             depth: Number of resolution levels (including the bottleneck).
-            width: Channels per level.
+            base_width: Channels per level.
+            max_width: Maximum channels per level.
             kernel_size: Kernel size of all ``ConvBlock``s; must be odd.
 
         Returns:
             A U-Net instance.
         """
-        widths: list[int] = [width * 2**i for i in range(depth)]
+        widths: list[int] = [base_width * 2**i for i in range(depth)]
+        if max_width is not None:
+            widths = [min(width, max_width) for width in widths]
+
         return cls(
             in_channels=in_channels,
             out_channels=out_channels,
