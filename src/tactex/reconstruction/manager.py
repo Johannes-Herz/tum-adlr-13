@@ -345,8 +345,7 @@ class TrainManager:
                 self.config.model_dump(mode="json"),
                 allow_val_change=False,
             )
-            callbacks: list = self._get_callbacks(run_id=wandb_run.run.id) + [wandb_run]
-
+            callbacks = [wandb_run]
             try:
                 (
                     model,
